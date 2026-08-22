@@ -25,11 +25,13 @@ config.userStrategyPath = "/sdcard/KardsScript/user-strategy.json";
 var loadedUserStrategy = userStrategy.read(config.userStrategyPath);
 var activeUserStrategy = userStrategy.apply(config, loadedUserStrategy.preferences);
 var out = "/sdcard/AutoJs6/KardsScript/auto-main-log.jsonl";
+var overlayStatus = "/sdcard/AutoJs6/KardsScript/floating-controller-status.jsonl";
 var runId = String(Date.now());
 var archiveDir = "/sdcard/AutoJs6/KardsScript/runs";
 var archive = archiveDir + "/games-" + runId + ".jsonl";
 try { files.ensureDir(archiveDir); } catch (e0) {}
 files.write(out, "");
+try { files.write(overlayStatus, ""); } catch (eOverlayLog) {}
 function record(item) { files.append(out, JSON.stringify(item) + "\n"); }
 function localBadgeColor(image, card, index, count) {
     var box = card && (card.costBounds || card.bounds);

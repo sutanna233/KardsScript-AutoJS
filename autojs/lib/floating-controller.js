@@ -7,11 +7,11 @@ function attach() {
     var window;
     try {
         window = floaty.rawWindow(
-            <frame id="panel" w="118" h="42" bg="#1b1f23" foreground="?attr/selectableItemBackground">
-                <horizontal padding="10 7" gravity="center_vertical">
-                    <View id="dot" w="7" h="7" bg="#78c896" />
-                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="14sp" textStyle="bold" marginLeft="7" w="150" gravity="center" />
-                    <text id="stop" text="停止" textColor="#c66" textSize="12sp" textStyle="bold" />
+            <frame id="panel" w="236" h="84" bg="#1b1f23" foreground="?attr/selectableItemBackground">
+                <horizontal w="236" h="84" padding="10 7" gravity="center_vertical">
+                    <View id="dot" w="12" h="12" bg="#78c896" />
+                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="18sp" textStyle="bold" marginLeft="7" w="145" h="70" gravity="center" />
+                    <text id="stop" text="停止" textColor="#ff7777" textSize="16sp" w="55" h="70" gravity="center" />
                 </horizontal>
             </frame>
         );
