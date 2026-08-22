@@ -73,7 +73,8 @@ config.tickMs = 300;
 config.maxSameSceneFrames = 2000;
 // 挂机模式默认持续运行；显式 targetGames 仅用于有界测试。
 var targetGames = config.targetGames == null ? Infinity : Math.max(1, Number(config.targetGames));
-var started = Date.now(), bot = null, restartCount = 0, completedGames = 0,
+var started = Date.now(), bot = null, restartCount = 0, consecutiveRecoveries = 0, completedGames = 0,
+    gamePhase = "IDLE", gameSessionId = null,
     observedBattleForCurrentGame = false, observedMulliganForCurrentGame = false,
     sawSetupScreen = false, resumedCurrentGame = false;
 config.actionLogger = function (action) {
@@ -116,7 +117,20 @@ while (completedGames < targetGames) {
         // Vision owns the single badge-colour decision. Do not overwrite it
         // with a second, less-calibrated scan at this boundary.
         var key = observation.uiScreen.screen + "/" + observation.scene.scene;
+        if (observeMs > 1200) record({ t: Date.now() - started, event: "vision-slow-frame", observeMs: observeMs, screen: observation.uiScreen.screen, scene: observation.scene.scene });
         if (key !== lastKey) {
+            var nextPhase = observation.uiScreen.screen === "RESULT" ? "RESULT" :
+                observation.uiScreen.screen === "BATTLE" ? "IN_GAME" :
+                ["HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN"].indexOf(observation.uiScreen.screen) >= 0 ? "SETUP" :
+                observation.uiScreen.screen === "RECONNECT" ? "RECOVERING" : gamePhase;
+            if (nextPhase !== gamePhase) {
+                gamePhase = nextPhase;
+                record({ t: Date.now() - started, event: "phase-changed", phase: gamePhase, screen: observation.uiScreen.screen });
+            }
+            if (observation.uiScreen.screen === "MULLIGAN" && !gameSessionId) {
+                gameSessionId = runId + "-" + (completedGames + 1);
+                record({ t: Date.now() - started, event: "game-started", gameSessionId: gameSessionId });
+            }
             record({ t: Date.now() - started, screen: observation.uiScreen.screen,
                 rule: observation.uiScreen.ruleId, scene: observation.scene.scene,
                 confidence: observation.uiScreen.confidence, endTurnOnly: observation.scene.endTurnOnly === true });
@@ -137,7 +151,10 @@ while (completedGames < targetGames) {
             if (observation.uiScreen.screen === "BATTLE" && observedMulliganForCurrentGame) observedBattleForCurrentGame = true;
             if (observation.uiScreen.screen === "RESULT" && observedBattleForCurrentGame && (observedMulliganForCurrentGame || resumedCurrentGame)) {
                 completedGames++;
-                record({ t: Date.now() - started, event: "game-complete", game: completedGames, resultRule: observation.uiScreen.ruleId });
+                record({ t: Date.now() - started, event: "game-complete", game: completedGames, gameSessionId: gameSessionId, resultRule: observation.uiScreen.ruleId });
+                consecutiveRecoveries = 0;
+                gamePhase = "RESULT";
+                gameSessionId = null;
                 observedBattleForCurrentGame = false;
                 observedMulliganForCurrentGame = false;
                 resumedCurrentGame = false;
@@ -201,16 +218,23 @@ while (completedGames < targetGames) {
         // otherwise repeated captureScreen() calls eventually stall the
         // Auto.js image pipeline during long matches.
         try { if (frame && frame.recycle) frame.recycle(); } catch (eRecycle) {}
-        sleep(config.tickMs);
+        var nextTick = observation.uiScreen.screen === "BATTLE" && observation.scene.scene === "OUR_TURN" ? 300 :
+            observation.scene.scene === "OPPONENT_TURN" ? 900 :
+            ["RESULT", "HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN"].indexOf(observation.uiScreen.screen) >= 0 ? 650 : 500;
+        if (observeMs > 1200) nextTick = Math.max(nextTick, 700);
+        sleep(nextTick);
     }
     var finalStatus = bot.status();
     var recoverable = /超时|场景长时间未变化|连续动作失败/.test(finalStatus.last || "");
-    // Recoverable runtime stops restart the game; a normal RESULT stop is not
-    // terminal in hangup mode because the outer loop continues automatically.
-    if (!bot.stopped() || !recoverable || restartCount >= 3) break;
+    // Hangup mode must not stop permanently after three recoverable errors.
+    // Use bounded exponential backoff and only stop after a long streak.
+    if (!bot.stopped() || !recoverable || consecutiveRecoveries >= 12) break;
+    consecutiveRecoveries++;
     restartCount++;
-    record({ t: Date.now() - started, recovery: "restart-after-runtime-stop", count: restartCount, status: finalStatus });
-    sleep(3000);
+    var recoveryDelay = Math.min(60000, 3000 * Math.pow(2, Math.min(4, consecutiveRecoveries - 1)));
+    record({ t: Date.now() - started, recovery: "restart-after-runtime-stop", count: restartCount,
+        consecutive: consecutiveRecoveries, delayMs: recoveryDelay, status: finalStatus });
+    sleep(recoveryDelay);
     if (typeof app !== "undefined" && app.launchPackage) {
         try { app.launchPackage(config.kardsPackage); sleep(1500); } catch (e2) { record({ error: "recovery-launch", detail: String(e2) }); }
     }
