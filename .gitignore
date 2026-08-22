@@ -17,3 +17,7 @@ fixtures/**/*.png
 .env.*
 .DS_Store
 Thumbs.db
+AGENTS.md
+CLAUDE.md
+**/AGENTS.md
+**/CLAUDE.md
