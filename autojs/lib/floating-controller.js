@@ -22,7 +22,9 @@ function attach() {
     // which makes the overlay disappear even though the WindowManager entry
     // was created successfully.
     global.__cometFloatingWindow = window;
+    try { window.setSize(236, 84); } catch (e) {}
     try { window.setPosition(1128, 280); } catch (e) {}
+    try { if (typeof window.setVisibility === "function") window.setVisibility(0); } catch (e) {}
     try { window.setTouchable(true); } catch (e) {}
     var paused = false;
     window.action.on("click", function () {
