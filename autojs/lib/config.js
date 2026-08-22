@@ -100,6 +100,15 @@ module.exports = {
     unitActionPaceMs: 650,
     endTurnPaceMs: 1100,
     navPaceMs: 1800,
+    // ── 内部超时参数（由节奏参数推导，不直接暴露给用户） ────────────────
+    // 这些值由 pace 参数驱动：快节奏 → 短超时，慢节奏 → 长超时。
+    // 不直接在用户策略中暴露，避免破坏确认逻辑。
+    playCardSettleMs: 750,
+    playCardConfirmTimeoutMs: 2400,
+    deploymentSettleWaitMs: 550,
+    unitDragDurationMs: 650,
+    unitActionConfirmTimeoutMs: 10000,
+    endTurnSettleMs: 1100,
     // Amortize expensive Auto.js template matching across frames. Unknown
     // occupied slots use unknownUnitTypeFallback immediately, while at most
     // one new concrete slot is calibrated per observation and then cached.
@@ -333,7 +342,7 @@ module.exports = {
     // Same measured rules as LayoutProfile.defaultUiScreenRules().
     uiRules: [
         { id: "reconnect", screen: "RECONNECT", priority: 100, anchors: [{ r: "reconnectModal", maxL: 85, maxS: 55, minE: 0.05 }, { r: "reconnectButton", minL: 110, maxS: 60, minE: 0.05 }] },
-        { id: "daily-quest", screen: "DAILY_QUEST", priority: 95, anchors: [{ r: "topUi", maxL: 35 }, { r: "menuCenter", minL: 90 }, { r: "resultReward", minL: 120 }] },
+        { id: "daily-quest", screen: "DAILY_QUEST", priority: 95, anchors: [{ r: "topUi", maxL: 35 }, { r: "menuCenter", minL: 80 }, { r: "resultReward", minL: 120 }] },
         // Real rotating HOME banners measured centre saturation 83.5–128.0;
         // the product page is materially lower at 52.9.
         { id: "home", screen: "HOME", priority: 20, anchors: [{ r: "topUi", minL: 48 }, { r: "menuCenter", minL: 60, minS: 80 }, { r: "rightPanel", minS: 65 }] },
