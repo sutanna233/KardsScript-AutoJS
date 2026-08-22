@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "name": "有界攻击专项测试",
+  "root": {
+    "id": "root",
+    "type": "priority",
+    "children": [
+      {
+        "id": "operate",
+        "type": "condition",
+        "whenAll": [{ "field": "hasOperableUnit", "operator": "EQ", "value": "true" }],
+        "then": {
+          "id": "operate-best",
+          "type": "action",
+          "action": { "kind": "OPERATE_UNIT", "actorSort": ["ATTACK_DESC"], "targetSort": ["THREAT_DESC", "ENEMY_HQ_FIRST"], "legalOnly": true }
+        }
+      },
+      { "id": "end-turn", "type": "action", "action": { "kind": "END_TURN" } }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "默认全自动中速",
+  "root": {
+    "id": "root", "type": "priority", "children": [
+      { "id": "play", "type": "condition", "whenAll": [{ "field": "hasPlayableCard", "operator": "EQ", "value": "true" }], "then": { "id": "play-best", "type": "action", "action": { "kind": "PLAY_CARD", "cardSort": ["USER_PRIORITY_DESC", "DEPLOYMENT_COST_DESC"], "targetSort": ["THREAT_DESC", "ENEMY_HQ_FIRST"], "legalOnly": true } } },
+      { "id": "operate", "type": "condition", "whenAll": [{ "field": "hasOperableUnit", "operator": "EQ", "value": "true" }], "then": { "id": "operate-best", "type": "action", "action": { "kind": "OPERATE_UNIT", "actorSort": ["ATTACK_DESC"], "targetSort": ["THREAT_DESC", "ENEMY_HQ_FIRST"], "legalOnly": true } } },
+      { "id": "end-turn", "type": "action", "action": { "kind": "END_TURN" } }
+    ]
+  }
+}

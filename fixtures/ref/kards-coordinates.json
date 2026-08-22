@@ -1,0 +1,202 @@
+{
+  "screen": {
+    "width": 1280,
+    "height": 720
+  },
+  "input_method": "input touchscreen tap",
+  "main_menu": {
+    "start": [
+      100,
+      260
+    ],
+    "cards": [
+      100,
+      400
+    ],
+    "shop": [
+      100,
+      520
+    ],
+    "battle_mode": [
+      290,
+      190
+    ],
+    "training_mode": [
+      290,
+      250
+    ],
+    "arena": [
+      290,
+      310
+    ],
+    "campaign": [
+      290,
+      370
+    ],
+    "battle_code": [
+      290,
+      430
+    ],
+    "tournament": [
+      290,
+      490
+    ]
+  },
+  "deck_detail": {
+    "card_back": [
+      830,
+      125
+    ],
+    "table_decoration": [
+      830,
+      260
+    ],
+    "hq": [
+      830,
+      410
+    ],
+    "emotes": [
+      830,
+      550
+    ],
+    "deck_name": [
+      1100,
+      90
+    ],
+    "start_button": [
+      1080,
+      620
+    ]
+  },
+  "training_deck_select": {
+    "new_deck": [
+      200,
+      400
+    ],
+    "battle_ready": [
+      640,
+      400
+    ],
+    "steel_tempering": [
+      1000,
+      400
+    ]
+  },
+  "battle": {
+    "enemy_hq": [
+      640,
+      180
+    ],
+    "enemy_hp": [
+      640,
+      205
+    ],
+    "player_hq": [
+      640,
+      500
+    ],
+    "player_hp": [
+      640,
+      520
+    ],
+    "battle_line_y": 350,
+    "end_turn": [
+      1120,
+      650
+    ],
+    "settings": [
+      1220,
+      45
+    ],
+    "enemy_kredits": [
+      75,
+      180
+    ],
+    "player_kredits": [
+      75,
+      550
+    ],
+    "enemy_hand_area": [
+      350,
+      0,
+      900,
+      60
+    ],
+    "player_hand_area": [
+      100,
+      200,
+      1200,
+      650
+    ],
+    "enemy_units_area": [
+      0,
+      100,
+      1280,
+      350
+    ],
+    "player_units_area": [
+      0,
+      350,
+      1280,
+      580
+    ],
+    "player_avatar": [
+      80,
+      580
+    ],
+    "player_name": [
+      80,
+      620
+    ]
+  },
+  "battle_2cards": {
+    "card1": [
+      180,
+      350
+    ],
+    "card2": [
+      400,
+      350
+    ]
+  },
+  "battle_4cards": {
+    "card1": [
+      175,
+      375
+    ],
+    "card2": [
+      380,
+      375
+    ],
+    "card3": [
+      595,
+      345
+    ],
+    "card4": [
+      1120,
+      395
+    ]
+  },
+  "battle_5cards": {
+    "card1": [
+      280,
+      550
+    ],
+    "card2": [
+      480,
+      550
+    ],
+    "card3": [
+      680,
+      550
+    ],
+    "card4": [
+      880,
+      550
+    ],
+    "card5": [
+      1080,
+      550
+    ]
+  }
+}

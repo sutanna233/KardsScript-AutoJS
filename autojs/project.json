@@ -1,0 +1,8 @@
+{
+  "name": "KardsScript Auto.js",
+  "main": "auto-main.js",
+  "ignore": ["captures/", "*.png"],
+  "packageName": "com.kardsscript.autojs",
+  "versionName": "0.2.0",
+  "versionCode": 2
+}

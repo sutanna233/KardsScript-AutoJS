@@ -1,0 +1,21 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KardsScript Decision Tree",
+  "type": "object",
+  "required": ["schemaVersion", "name", "root"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "root": { "$ref": "#/$defs/node" }
+  },
+  "$defs": {
+    "node": {
+      "oneOf": [
+        { "type": "object", "required": ["id", "type", "children"], "properties": { "id": {"type":"string"}, "type":{"const":"priority"}, "children":{"type":"array", "items":{"$ref":"#/$defs/node"}} } },
+        { "type": "object", "required": ["id", "type", "children"], "properties": { "id": {"type":"string"}, "type":{"const":"sequence"}, "children":{"type":"array", "items":{"$ref":"#/$defs/node"}} } },
+        { "type": "object", "required": ["id", "type", "whenAll", "then"], "properties": { "id": {"type":"string"}, "type":{"const":"condition"}, "whenAll":{"type":"array"}, "then":{"$ref":"#/$defs/node"} } },
+        { "type": "object", "required": ["id", "type", "action"], "properties": { "id": {"type":"string"}, "type":{"const":"action"}, "action":{"type":"object"} } }
+      ]
+    }
+  }
+}
