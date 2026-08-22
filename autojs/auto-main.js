@@ -4,7 +4,7 @@ var base = require("./lib/config");
 var vision = require("./lib/vision");
 var runtime = require("./lib/runtime");
 var userStrategy = require("./lib/user-strategy");
-var floatingController = require("./lib/floating-controller");
+// var floatingController = require("./lib/floating-controller"); // rawWindow 在 inrt 上仍会裁剪，暂时禁用
 var config = {};
 Object.keys(base).forEach(function (key) { config[key] = base[key]; });
 config.mode = "automatic";
@@ -59,7 +59,9 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
-try { floatingController.attach(); } catch (controllerError) { record({ warning: "floating-controller", error: String(controllerError) }); }
+// 悬浮窗目前先禁用，避免 Auto.js6 rawWindow 在 inrt 中出现子控件裁剪。
+// 保留 __cometPaused 状态，后续改为可靠的原生悬浮服务。
+global.__cometPaused = false;
 sleep(1200);
 if (typeof app !== "undefined" && app.launchPackage) {
     try { app.launchPackage(config.kardsPackage); sleep(1000); }
@@ -101,7 +103,21 @@ while (completedGames < targetGames) {
         // had refined it to eight, creating a permanent false-success loop.
         var pendingKind = bot.pendingAction && bot.pendingAction();
         config.fastPending = !!pendingKind && pendingKind !== "PLAY_CARD";
-        var frame = captureScreen(), observeStarted = Date.now(), observation = analyzer.observe(frame), observeMs = Date.now() - observeStarted;
+        var frame;
+        try {
+            frame = captureScreen();
+            if (!frame) { record({ t: Date.now() - started, event: "capture-empty" }); sleep(800); continue; }
+            if (frame.getWidth() !== 1280 || frame.getHeight() !== 720) {
+                record({ t: Date.now() - started, event: "capture-size-mismatch", width: frame.getWidth(), height: frame.getHeight() });
+                sleep(1200);
+                continue;
+            }
+        } catch (captureError) {
+            record({ t: Date.now() - started, event: "capture-failed", error: String(captureError) });
+            sleep(1200);
+            continue;
+        }
+        var observeStarted = Date.now(), observation = analyzer.observe(frame), observeMs = Date.now() - observeStarted;
         frameNumber++;
         if (frameNumber === 1 || frameNumber % 10 === 0) record({ t: Date.now() - started, performance: true, frame: frameNumber, observeMs: observeMs });
         // In automatic mode the orange/grey badge is the authoritative live
