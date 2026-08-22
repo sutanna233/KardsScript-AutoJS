@@ -1,61 +1,47 @@
-// A small, self-owned pause/stop control for the active battle engine.
-// The overlay deliberately exposes no game action: it only pauses, resumes,
-// or stops this script, which makes it safe above a fullscreen KARDS match.
+// Two independent single-view windows avoid Auto.js6 inrt rawWindow child-layout clipping.
 function attach() {
     if (typeof floaty === "undefined" || !floaty) return null;
-    // inrt 环境可能不暴露 checkPermission；直接尝试创建窗口，失败则静默返回。
-    var window;
+    var pauseWindow, stopWindow;
     try {
-        window = floaty.rawWindow(
-            <frame id="panel" w="180" h="72" bg="#1b1f23">
-                <horizontal w="180" h="72" padding="6 4" gravity="center_vertical">
-                    <View id="dot" w="8" h="8" bg="#78c896" />
-                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="14sp" textStyle="bold" marginLeft="5" w="105" h="64" gravity="center" />
-                    <text id="stop" text="停止" textColor="#ff7777" textSize="13sp" w="55" h="64" gravity="center" />
-                </horizontal>
-            </frame>
+        pauseWindow = floaty.rawWindow(
+            <text id="button" text="暂停" w="100" h="48" bg="#1b1f23" textColor="#f3e4bd" textSize="14sp" textStyle="bold" gravity="center" />
+        );
+        stopWindow = floaty.rawWindow(
+            <text id="button" text="停止" w="60" h="48" bg="#1b1f23" textColor="#ff7777" textSize="13sp" textStyle="bold" gravity="center" />
         );
     } catch (e) { return null; }
-    if (!window) return null;
-    // Keep a strong engine-global reference. In packaged/inrt runs the local
-    // return value is otherwise eligible for GC immediately after attach(),
-    // which makes the overlay disappear even though the WindowManager entry
-    // was created successfully.
-    global.__cometFloatingWindow = window;
+    if (!pauseWindow || !stopWindow) return null;
+    global.__cometFloatingWindow = { pause: pauseWindow, stop: stopWindow };
     var statusPath = "/sdcard/AutoJs6/KardsScript/floating-controller-status.jsonl";
     function status(event, extra) {
         var item = { t: Date.now(), event: event };
         if (extra) Object.keys(extra).forEach(function (k) { item[k] = extra[k]; });
         try { files.append(statusPath, JSON.stringify(item) + "\n"); } catch (_) {}
     }
-    status("overlay-attached", { width: 180, height: 72, x: 1080, y: 80 });
-    try { window.panel.setVisibility(0); } catch (e) {}
-    try { window.setSize(180, 72); } catch (e) {}
-    try { window.setPosition(1080, 80); } catch (e) {}
-    try { if (typeof window.setVisibility === "function") window.setVisibility(0); } catch (e) {}
-    try { window.setTouchable(true); } catch (e) {}
+    status("overlay-attached", { width: 160, height: 48, x: 1080, y: 80, scheme: "split-single-view" });
+    try { pauseWindow.setSize(100, 48); pauseWindow.setPosition(1080, 80); } catch (_) {}
+    try { stopWindow.setSize(60, 48); stopWindow.setPosition(1180, 80); } catch (_) {}
+    try { pauseWindow.button.setVisibility(0); stopWindow.button.setVisibility(0); } catch (_) {}
+    try { if (typeof pauseWindow.setVisibility === "function") pauseWindow.setVisibility(0); } catch (_) {}
+    try { if (typeof stopWindow.setVisibility === "function") stopWindow.setVisibility(0); } catch (_) {}
+    try { pauseWindow.setTouchable(true); stopWindow.setTouchable(true); } catch (_) {}
     var paused = false;
-    window.action.on("click", function () {
-        if (!paused) {
-            global.__cometPaused = true;
-            paused = true;
-            status("overlay-paused");
-            window.action.setText("继续");
-            window.dot.setBackgroundColor(colors.parseColor("#c69b46"));
-        } else {
-            global.__cometPaused = false;
-            paused = false;
-            status("overlay-resumed");
-            window.action.setText("暂停");
-            window.dot.setBackgroundColor(colors.parseColor("#78c896"));
-        }
+    pauseWindow.button.on("click", function () {
+        paused = !paused;
+        global.__cometPaused = paused;
+        status(paused ? "overlay-paused" : "overlay-resumed");
+        pauseWindow.button.setText(paused ? "继续" : "暂停");
     });
-    window.stop.on("click", function () {
+    stopWindow.button.on("click", function () {
         global.__cometPaused = false;
         status("overlay-stopped");
         try { engines.myEngine().forceStop(); } catch (_) { exit(); }
     });
-    events.on("exit", function () { global.__cometPaused = false; try { window.close(); } catch (_) {} });
-    return window;
+    events.on("exit", function () {
+        global.__cometPaused = false;
+        try { pauseWindow.close(); } catch (_) {}
+        try { stopWindow.close(); } catch (_) {}
+    });
+    return pauseWindow;
 }
 module.exports = { attach: attach };
