@@ -10,8 +10,8 @@ module.exports = {
     // separators but wide enough for font/layout drift.
     MODE_TRAINING: [255 / 1280, 220 / 720, 460 / 1280, 298 / 720],
     // 对战模式（PvP）入口：模式菜单第一行（模板 mode-battle-selected/unselected）。
-    // 坐标来自 templates/buttons/manifest.json 实测裁剪记录。
-    MODE_VERSUS: [255 / 1280, 155 / 720, 460 / 1280, 230 / 720],
+    // 网格校准：文字中心在 C3 格 (320, 180)。包围盒收紧到文字区域。
+    MODE_VERSUS: [245 / 1280, 160 / 720, 395 / 1280, 200 / 720],
     // 对战卡组详情页的排位/休闲切换（模板 deck-ranked(-selected) / deck-casual-(un)selected）。
     // 排位在左、休闲在右；开始按钮在下方。
     RANKED_TOGGLE: [922 / 1280, 510 / 720, 1080 / 1280, 570 / 720],
@@ -28,8 +28,8 @@ module.exports = {
     RESULT_CONTINUE: [540 / 1280, 630 / 720, 740 / 1280, 705 / 720],
     RESULT_VIEW_BATTLE: [959 / 1280, 43 / 720, 1235 / 1280, 107 / 720],
     RECONNECT: [490 / 1280, 400 / 720, 790 / 1280, 470 / 720],
-    // Daily-quest modal has no reliable close icon in this build; tapping the
-    // dimmed area outside the card dismisses it without changing navigation.
+    // 每日任务弹窗没有关闭按钮，点击弹窗外的空白暗区即可关闭。
+    // 原实机验证坐标：右下角弹窗外空白区域；不要点击“拒绝任务”按钮。
     DAILY_QUEST_DISMISS: [1050 / 1280, 600 / 720, 1190 / 1280, 690 / 720],
     POPUP_CLOSE: [920 / 1280, 80 / 720, 980 / 1280, 140 / 720],
     PROMO_POPUP_CLOSE: [1160 / 1280, 102 / 720, 1190 / 1280, 142 / 720]
