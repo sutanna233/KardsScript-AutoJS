@@ -10,8 +10,8 @@ function attach() {
             <frame id="panel" w="118" h="42" bg="#1b1f23" foreground="?attr/selectableItemBackground">
                 <horizontal padding="10 7" gravity="center_vertical">
                     <View id="dot" w="7" h="7" bg="#78c896" />
-                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="14sp" textStyle="bold" marginLeft="7" layout_weight="1" />
-                    <text id="stop" text="停" textColor="#c66" textSize="12sp" textStyle="bold" />
+                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="14sp" textStyle="bold" marginLeft="7" w="150" gravity="center" />
+                    <text id="stop" text="停止" textColor="#c66" textSize="12sp" textStyle="bold" />
                 </horizontal>
             </frame>
         );
@@ -22,10 +22,15 @@ function attach() {
     // which makes the overlay disappear even though the WindowManager entry
     // was created successfully.
     global.__cometFloatingWindow = window;
+    var statusPath = "/sdcard/AutoJs6/KardsScript/floating-controller-status.jsonl";
+    function status(event, extra) {
+        var item = { t: Date.now(), event: event };
+        if (extra) Object.keys(extra).forEach(function (k) { item[k] = extra[k]; });
+        try { files.append(statusPath, JSON.stringify(item) + "\n"); } catch (_) {}
+    }
+    status("overlay-attached", { width: 236, height: 84, x: 900, y: 80 });
+    try { window.panel.setVisibility(0); } catch (e) {}
     try { window.setSize(236, 84); } catch (e) {}
-    // Keep the panel fully inside the 1280x720 landscape viewport. The old
-    // x=1128 position placed a 236px window partly off-screen on some inrt
-    // builds and made it appear absent.
     try { window.setPosition(900, 80); } catch (e) {}
     try { if (typeof window.setVisibility === "function") window.setVisibility(0); } catch (e) {}
     try { window.setTouchable(true); } catch (e) {}
@@ -34,17 +39,20 @@ function attach() {
         if (!paused) {
             global.__cometPaused = true;
             paused = true;
+            status("overlay-paused");
             window.action.setText("继续");
             window.dot.setBackgroundColor(colors.parseColor("#c69b46"));
         } else {
             global.__cometPaused = false;
             paused = false;
+            status("overlay-resumed");
             window.action.setText("暂停");
             window.dot.setBackgroundColor(colors.parseColor("#78c896"));
         }
     });
     window.stop.on("click", function () {
         global.__cometPaused = false;
+        status("overlay-stopped");
         try { engines.myEngine().forceStop(); } catch (_) { exit(); }
     });
     events.on("exit", function () { global.__cometPaused = false; try { window.close(); } catch (_) {} });
