@@ -17,6 +17,11 @@ function attach() {
         );
     } catch (e) { return null; }
     if (!window) return null;
+    // Keep a strong engine-global reference. In packaged/inrt runs the local
+    // return value is otherwise eligible for GC immediately after attach(),
+    // which makes the overlay disappear even though the WindowManager entry
+    // was created successfully.
+    global.__cometFloatingWindow = window;
     try { window.setPosition(1128, 280); } catch (e) {}
     try { window.setTouchable(true); } catch (e) {}
     var paused = false;
