@@ -23,7 +23,10 @@ function attach() {
     // was created successfully.
     global.__cometFloatingWindow = window;
     try { window.setSize(236, 84); } catch (e) {}
-    try { window.setPosition(1128, 280); } catch (e) {}
+    // Keep the panel fully inside the 1280x720 landscape viewport. The old
+    // x=1128 position placed a 236px window partly off-screen on some inrt
+    // builds and made it appear absent.
+    try { window.setPosition(900, 80); } catch (e) {}
     try { if (typeof window.setVisibility === "function") window.setVisibility(0); } catch (e) {}
     try { window.setTouchable(true); } catch (e) {}
     var paused = false;
