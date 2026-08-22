@@ -7,11 +7,11 @@ function attach() {
     var window;
     try {
         window = floaty.rawWindow(
-            <frame id="panel" w="180" h="56" bg="#1b1f23" foreground="?attr/selectableItemBackground">
-                <horizontal w="180" h="56" padding="6 4" gravity="center_vertical">
+            <frame id="panel" w="180" h="72" bg="#1b1f23">
+                <horizontal w="180" h="72" padding="6 4" gravity="center_vertical">
                     <View id="dot" w="8" h="8" bg="#78c896" />
-                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="14sp" textStyle="bold" marginLeft="5" w="105" h="48" gravity="center" />
-                    <text id="stop" text="停止" textColor="#ff7777" textSize="13sp" w="55" h="48" gravity="center" />
+                    <text id="action" text="暂停" textColor="#f3e4bd" textSize="14sp" textStyle="bold" marginLeft="5" w="105" h="64" gravity="center" />
+                    <text id="stop" text="停止" textColor="#ff7777" textSize="13sp" w="55" h="64" gravity="center" />
                 </horizontal>
             </frame>
         );
@@ -28,9 +28,9 @@ function attach() {
         if (extra) Object.keys(extra).forEach(function (k) { item[k] = extra[k]; });
         try { files.append(statusPath, JSON.stringify(item) + "\n"); } catch (_) {}
     }
-    status("overlay-attached", { width: 180, height: 56, x: 1080, y: 80 });
+    status("overlay-attached", { width: 180, height: 72, x: 1080, y: 80 });
     try { window.panel.setVisibility(0); } catch (e) {}
-    try { window.setSize(180, 56); } catch (e) {}
+    try { window.setSize(180, 72); } catch (e) {}
     try { window.setPosition(1080, 80); } catch (e) {}
     try { if (typeof window.setVisibility === "function") window.setVisibility(0); } catch (e) {}
     try { window.setTouchable(true); } catch (e) {}
