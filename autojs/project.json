@@ -1,8 +1,9 @@
 {
-  "name": "KardsScript Auto.js",
-  "main": "auto-main.js",
-  "ignore": ["captures/", "*.png"],
+  "name": "彗星助手",
+  "main": "apk-main.js",
+  "ignore": ["captures/"],
+  "icon": "assets/comet-assistant-icon.png",
   "packageName": "com.kardsscript.autojs",
-  "versionName": "0.2.0",
-  "versionCode": 2
+  "versionName": "0.3.0",
+  "versionCode": 3
 }

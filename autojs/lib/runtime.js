@@ -3,7 +3,7 @@ var strategy = require("./strategy");
 var driverModule = require("./driver");
 
 module.exports.create = function (config) {
-    var stopped = false, last = "", same = 0, signature = "", pending = null, failures = 0, endTurnRequestedAt = 0, deploymentCursor = 0, failedDeploymentSlots = {}, skippedCardPlay = false, handSignature = "", handStable = 0, blockedCardIds = {}, blockedUnitIds = {}, blockedUnitBounds = {}, unitActionRetries = {}, unitAttempts = 0, playAttempts = 0, opponentTurnSince = 0, startupSince = Date.now(), startupDismissed = {};
+    var stopped = false, last = "", same = 0, signature = "", pending = null, failures = 0, endTurnRequestedAt = 0, deploymentCursor = 0, failedDeploymentSlots = {}, skippedCardPlay = false, handSignature = "", handStable = 0, blockedCardIds = {}, blockedUnitIds = {}, blockedUnitBounds = {}, unitActionRetries = {}, unitAttempts = 0, playAttempts = 0, opponentTurnSince = 0;
     var driver = driverModule.create(config);
     var planner = strategy.create(config);
     // Auto.js6 also surfaces console output as an on-screen overlay.  Any
@@ -198,7 +198,8 @@ module.exports.create = function (config) {
                     failures = 0;
                     return log(moveConfirmed ? "单位前移已由棋盘位置变化确认" : "单位攻击已由棋盘状态变化确认");
                 }
-                var unitConfirmTimeout = typeof config.unitActionConfirmTimeoutMs === "number" ? config.unitActionConfirmTimeoutMs : (config.unitActionPaceMs || 5000);
+                // 显式设置的超时值优先；未设置时才由节奏参数推导。
+                var unitConfirmTimeout = typeof config.unitActionConfirmTimeoutMs === "number" ? config.unitActionConfirmTimeoutMs : Math.max(2000, (config.unitActionPaceMs || 650) * 3);
                 if (Date.now() - pending.sentAt < unitConfirmTimeout) return log("等待单位动作画面确认");
                 // A single Unreal frame transition can swallow an otherwise
                 // valid drag. Re-observe and retry one attack once before
@@ -262,7 +263,8 @@ module.exports.create = function (config) {
                     pending = null; failures = 0; return log("出牌已由手牌数量变化确认");
                 }
                 pending.observedFrames = (pending.observedFrames || 0) + 1;
-                var playConfirmTimeout = typeof config.playCardConfirmTimeoutMs === "number" ? config.playCardConfirmTimeoutMs : 5000;
+                // 显式设置的超时值优先；未设置时才由节奏参数推导。
+                var playConfirmTimeout = typeof config.playCardConfirmTimeoutMs === "number" ? config.playCardConfirmTimeoutMs : Math.max(1500, (config.cardPlayPaceMs || 750) * 2);
                 if (pending.observedFrames < 2 || Date.now() - pending.sentAt < Math.max(config.playCardSettleMs || 0, playConfirmTimeout)) return log("等待出牌结果稳定确认");
                 playAttempts++;
                 if (pending.deploymentSlotId) failedDeploymentSlots[pending.deploymentSlotId] = true;
@@ -541,25 +543,6 @@ module.exports.create = function (config) {
         log("[" + key + "] " + ui.ruleId + " " + ui.confidence.toFixed(2));
         if (same > config.maxSameSceneFrames) { stopped = true; return log("场景长时间未变化，已安全停止"); }
         if (config.mode !== "automatic") return;
-        // 启动恢复：KARDS 从桌面拉起后可能先弹每日任务/促销广告/商店弹窗。
-        // 这些页面分类置信度可能低于阈值（弹窗遮挡背景锚点），导致状态机卡住。
-        // 启动后 60 秒内，UNKNOWN 页面超过 4 帧时按已知安全坐标尝试关闭弹窗。
-        if (Date.now() - startupSince < 60000 && ui.screen === "UNKNOWN" && same >= 4) {
-            var dismissOrder = [
-                { key: "popup", bounds: [0.895, 0.12, 0.95, 0.22], label: "促销弹窗关闭" },
-                { key: "daily", bounds: [0.82, 0.83, 0.93, 0.96], label: "每日任务关闭" },
-                { key: "popup2", bounds: [0.72, 0.06, 0.76, 0.10], label: "通用弹窗关闭" }
-            ];
-            for (var di = 0; di < dismissOrder.length; di++) {
-                var d = dismissOrder[di];
-                if (!startupDismissed[d.key]) {
-                    startupDismissed[d.key] = true;
-                    log("启动恢复：尝试关闭弹窗 (" + d.label + ")");
-                    driver.dismissPopup(d.bounds, observation.frame);
-                    return;
-                }
-            }
-        }
         if (ui.confidence < config.minUiConfidence) return log("界面置信度不足，未操作");
         // Hand fan detection is relevant only to selecting a card source.
         // It must not gate an already visible unit action: the fan can keep

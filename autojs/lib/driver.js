@@ -95,15 +95,23 @@ function create(config) {
         // not fire the same tap every 750ms while Unreal is still animating;
         // abandon it after a bounded wait so a dead click cannot cascade.
         var navigationKey = screen + "/" + (ruleId || "");
+        var navPace = config.navPaceMs || 1800;
         if (navigationPending && navigationPending.key === navigationKey) {
             var age = Date.now() - navigationPending.sentAt;
-            if (age < 1800) return { ok: true, detail: "等待导航页面切换" };
-            if (age < 7000) return { ok: true, detail: "等待导航页面确认" };
+            if (age < navPace) return { ok: true, detail: "等待导航页面切换" };
+            if (age < navPace * 3.9) return { ok: true, detail: "等待导航页面确认" };
             navigationPending = null;
             return { ok: false, detail: "导航点击后页面未切换: " + screen };
         }
         if (navigationPending && navigationPending.key !== navigationKey) navigationPending = null;
         if (screen === "MODE_MENU") {
+            // 对战模式已选中（金色高亮）时，页面已展开卡组列表，应直接点第一个卡组。
+            // 避免反复点击已选中的模式行导致页面不切换。
+            if ((config.modeType === "casual" || config.modeType === "ranked") && state && state.versusSelected === true) {
+                var deckTap = tap(slots.DECK_DEFAULT, frame, "对战模式已选中，点击第一个卡组");
+                if (deckTap.ok) navigationPending = { screen: screen, key: navigationKey + "/deck", sentAt: Date.now() };
+                return deckTap;
+            }
             var modeSlot = config.modeType === "casual" || config.modeType === "ranked" ? slots.MODE_VERSUS : slots.MODE_TRAINING;
             var modeTap = tap(modeSlot, frame, config.modeType === "casual" || config.modeType === "ranked" ? "已在模式菜单点击对战模式" : "已在模式菜单点击训练模式");
             if (modeTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };

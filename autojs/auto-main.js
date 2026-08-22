@@ -3,6 +3,8 @@
 var base = require("./lib/config");
 var vision = require("./lib/vision");
 var runtime = require("./lib/runtime");
+var userStrategy = require("./lib/user-strategy");
+var floatingController = require("./lib/floating-controller");
 var config = {};
 Object.keys(base).forEach(function (key) { config[key] = base[key]; });
 config.mode = "automatic";
@@ -18,6 +20,10 @@ config.readCardCosts = false;
 config.readHandTypes = false;
 config.requireUnitTypeForDeployment = false;
 config.trustVisualForeground = true;
+// The standalone APK and launcher share this user-editable strategy file.
+config.userStrategyPath = "/sdcard/KardsScript/user-strategy.json";
+var loadedUserStrategy = userStrategy.read(config.userStrategyPath);
+var activeUserStrategy = userStrategy.apply(config, loadedUserStrategy.preferences);
 var out = "/sdcard/AutoJs6/KardsScript/auto-main-log.jsonl";
 var runId = String(Date.now());
 var archiveDir = "/sdcard/AutoJs6/KardsScript/runs";
@@ -51,6 +57,7 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
+try { floatingController.attach(); } catch (controllerError) { record({ warning: "floating-controller", error: String(controllerError) }); }
 sleep(1200);
 if (typeof app !== "undefined" && app.launchPackage) {
     try { app.launchPackage(config.kardsPackage); sleep(1000); }
@@ -73,7 +80,9 @@ var started = Date.now(), bot = null, restartCount = 0, completedGames = 0,
 config.actionLogger = function (action) {
     record({ t: Date.now() - started, event: "driver-action", action: action });
 };
-record({ event: "run-start", runId: runId, targetGames: targetGames, requireMulligan: true });
+record({ event: "run-start", runId: runId, targetGames: targetGames, requireMulligan: true,
+    userStrategy: activeUserStrategy, userStrategySource: loadedUserStrategy.source,
+    userStrategyErrors: loadedUserStrategy.errors });
 // A real training match can exceed three minutes; keep the entrypoint alive
 // long enough to reach RESULT while runtime-level timeout guards still stop
 // disconnected/opponent-stalled sessions safely.
@@ -82,6 +91,8 @@ while (completedGames < targetGames && Date.now() - started < 1800000) {
     bot = runtime.create(config);
     var lastKey = "", lastStatus = "", lastBattleEvidence = "", frameNumber = 0;
     while (!bot.stopped() && completedGames < targetGames && Date.now() - started < 1800000) {
+        // 悬浮窗暂停：设置 __cometPaused 后跳过识别/决策/动作，仅等待。
+        if (global.__cometPaused === true) { sleep(500); continue; }
         // A card play must keep the full hand geometry path enabled so the
         // post-action count is comparable with the pre-action count.  The
         // old fast path reported the raw six-card fan while the normal path

@@ -32,21 +32,26 @@ function effectiveUnitType(unit) {
     var type = String(unit && unit.type || "UNKNOWN").toUpperCase();
     return type === "UNKNOWN" ? "INFANTRY" : type;
 }
-function cardPlayScore(card) {
+function cardPlayScore(card, config) {
     // Safety first: card/body confidence is the primary key, followed by the
     // strength of the game's orange affordability signal. Cost and user
     // priority are only tie-breakers; hand position never participates.
     var badgeScore = number(card && card.costBadgeScore,
         number(card && card.costBadge && card.costBadge.score, 0));
     var confirmedCost = card && typeof card.cost === "number" ? 1 : 0;
-    return number(card && card.playConfidence, number(card && card.confidence, 0)) * 1000000 +
+    var base = number(card && card.playConfidence, number(card && card.confidence, 0)) * 1000000 +
         badgeScore * 10000 + confirmedCost * 1000 +
         number(card && card.priority, 0) * 10 + number(card && card.cost, 0);
+    // All candidates have passed the same orange-badge safety gate. The GUI
+    // can choose a bounded tie-breaker without relaxing that gate.
+    if (config && config.cardPreference === "HIGH_COST") return base + number(card && card.cost, 0) * 2000000;
+    if (config && config.cardPreference === "LOW_COST") return base - number(card && card.cost, 0) * 2000000;
+    return base;
 }
 function pickPlayableCard(cards, blockedCardIds, config) {
     return pick(playable(cards, null, config).filter(function (card) {
         return !isBlocked(card, blockedCardIds);
-    }), cardPlayScore);
+    }), function (card) { return cardPlayScore(card, config); });
 }
 function guardsHeadquarters(target) {
     return target && target.kind === "ENEMY_UNIT" && (target.isGuard === true || target.guardsHeadquarters === true || (target.tags || []).indexOf("GUARD") >= 0);
@@ -117,13 +122,15 @@ function heuristic(state, config) {
 }
 
 function create(config) {
-    var loaded = decision.load(config && config.decisionTreePath);
+    var loaded = config && config.decisionTreeOverride ?
+        { tree: config.decisionTreeOverride, source: "用户基础策略", errors: decision.errors(config.decisionTreeOverride) } :
+        decision.load(config && config.decisionTreePath);
     function decidePlan(state) {
         var action = loaded.errors.length ? null : decision.decide(loaded.tree, state);
         if (!action) return heuristic(state, config);
         if (action.kind === domain.Action.END_TURN) return { kind: action.kind, confidence: 1, targetSort: action.targetSort || [] };
         var candidates = action.kind === domain.Action.PLAY_CARD ? playable(state.hand, state.credits, config).filter(function (card) { return !isBlocked(card, state.blockedCardIds); }) : (state.units || []).filter(function (unit) { return unit.owner === "PLAYER" && unit.canOperate && !isBlockedUnit(unit, state.blockedUnitIds); });
-        var source = action.kind === domain.Action.PLAY_CARD ? pick(candidates, cardPlayScore) :
+            var source = action.kind === domain.Action.PLAY_CARD ? pick(candidates, function (card) { return cardPlayScore(card, config); }) :
             pick(candidates, function (item) { return number(item.priority, 0) * 100 + number(item.attack, 0) * 10 + number(item.cost, 0); });
         if (source) {
             // A rear unit cannot attack the opposing rear/frontline target in

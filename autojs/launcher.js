@@ -32,6 +32,17 @@ ui.layout(
                 </card>
                 <card w="*" cardCornerRadius="12dp" cardElevation="0dp" cardBackgroundColor="#1b1f23" marginBottom="12">
                     <vertical padding="16">
+                        <text text="对局模式" textColor="#c69b46" textSize="13sp" textStyle="bold" />
+                        <radiogroup id="modeType" orientation="horizontal" marginTop="8">
+                            <radio id="modeTraining" text="训练模式" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                            <radio id="modeCasual" text="休闲模式" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                            <radio id="modeRanked" text="排位模式" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                        </radiogroup>
+                        <text text="训练为 AI 对战，休闲/排位为真人 PvP。" textColor="#9aa2aa" textSize="12sp" marginTop="6" />
+                    </vertical>
+                </card>
+                <card w="*" cardCornerRadius="12dp" cardElevation="0dp" cardBackgroundColor="#1b1f23" marginBottom="12">
+                    <vertical padding="16">
                         <text text="回合节奏" textColor="#c69b46" textSize="13sp" textStyle="bold" />
                         <radiogroup id="actionOrder" orientation="horizontal" marginTop="8">
                             <radio id="orderUnits" text="单位优先" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
@@ -78,6 +89,44 @@ ui.layout(
                         </horizontal>
                     </vertical>
                 </card>
+                <card w="*" cardCornerRadius="12dp" cardElevation="0dp" cardBackgroundColor="#1b1f23" marginBottom="12">
+                    <vertical padding="16">
+                        <text text="操作节奏" textColor="#c69b46" textSize="13sp" textStyle="bold" />
+                        <text text="值越小操作越频繁，但过快可能导致游戏不响应。" textColor="#9aa2aa" textSize="12sp" marginTop="4" />
+                        <horizontal gravity="center_vertical" marginTop="10">
+                            <text text="出牌间隔" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                            <radiogroup id="cardPace" orientation="horizontal">
+                                <radio id="cardPaceFast" text="快" textColor="#f4f5f6" />
+                                <radio id="cardPaceNormal" text="标准" textColor="#f4f5f6" />
+                                <radio id="cardPaceSlow" text="慢" textColor="#f4f5f6" />
+                            </radiogroup>
+                        </horizontal>
+                        <horizontal gravity="center_vertical" marginTop="8">
+                            <text text="单位操作间隔" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                            <radiogroup id="unitPace" orientation="horizontal">
+                                <radio id="unitPaceFast" text="快" textColor="#f4f5f6" />
+                                <radio id="unitPaceNormal" text="标准" textColor="#f4f5f6" />
+                                <radio id="unitPaceSlow" text="慢" textColor="#f4f5f6" />
+                            </radiogroup>
+                        </horizontal>
+                        <horizontal gravity="center_vertical" marginTop="8">
+                            <text text="结束回合等待" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                            <radiogroup id="endTurnPace" orientation="horizontal">
+                                <radio id="endTurnFast" text="快" textColor="#f4f5f6" />
+                                <radio id="endTurnNormal" text="标准" textColor="#f4f5f6" />
+                                <radio id="endTurnSlow" text="慢" textColor="#f4f5f6" />
+                            </radiogroup>
+                        </horizontal>
+                        <horizontal gravity="center_vertical" marginTop="8">
+                            <text text="导航点击间隔" textColor="#f4f5f6" textSize="15sp" layout_weight="1" />
+                            <radiogroup id="navPace" orientation="horizontal">
+                                <radio id="navFast" text="快" textColor="#f4f5f6" />
+                                <radio id="navNormal" text="标准" textColor="#f4f5f6" />
+                                <radio id="navSlow" text="慢" textColor="#f4f5f6" />
+                            </radiogroup>
+                        </horizontal>
+                    </vertical>
+                </card>
                 <text id="validation" textColor="#ffb4ab" textSize="13sp" margin="4 4 4 10" />
             </vertical>
         </ScrollView>
@@ -101,6 +150,18 @@ function display() {
     ui.preferFrontline.setChecked(current.preferFrontlineUnits === true);
     ([ui.plays1, ui.plays2, ui.plays3][Math.max(0, current.maxCardPlaysPerTurn - 1)] || ui.plays3).setChecked(true);
     ([ui.unit1, ui.unit2, ui.unit3][Math.max(0, current.maxUnitActionAttemptsPerUnit - 1)] || ui.unit2).setChecked(true);
+    ({ training: ui.modeTraining, casual: ui.modeCasual, ranked: ui.modeRanked }[current.modeType] || ui.modeTraining).setChecked(true);
+    // 节奏参数：映射到快/标准/慢三档
+    var paceMap = { fast: 300, normal: null, slow: null }; // normal/slow use per-field defaults
+    function paceRadio(group, value, fastVal, normalVal, slowVal) {
+        if (value <= fastVal) group[0].setChecked(true);
+        else if (value <= normalVal) group[1].setChecked(true);
+        else group[2].setChecked(true);
+    }
+    paceRadio([ui.cardPaceFast, ui.cardPaceNormal, ui.cardPaceSlow], current.cardPlayPaceMs, 400, 750);
+    paceRadio([ui.unitPaceFast, ui.unitPaceNormal, ui.unitPaceSlow], current.unitActionPaceMs, 400, 650);
+    paceRadio([ui.endTurnFast, ui.endTurnNormal, ui.endTurnSlow], current.endTurnPaceMs, 700, 1100);
+    paceRadio([ui.navFast, ui.navNormal, ui.navSlow], current.navPaceMs, 1000, 1800);
     ui.validation.setText(loaded.errors.length ? loaded.errors.join("\n") : "");
     ui.status.setText("配置来源：" + loaded.source);
 }
@@ -109,6 +170,13 @@ function formValue() {
     var cardPreference = ui.prefHigh.isChecked() ? "HIGH_COST" : ui.prefLow.isChecked() ? "LOW_COST" : "VISUAL_CONFIDENCE";
     var maxPlays = ui.plays1.isChecked() ? 1 : ui.plays2.isChecked() ? 2 : 3;
     var maxUnitActions = ui.unit1.isChecked() ? 1 : ui.unit2.isChecked() ? 2 : 3;
+    var modeType = ui.modeCasual.isChecked() ? "casual" : ui.modeRanked.isChecked() ? "ranked" : "training";
+    // 节奏三档映射：快/标准/慢
+    function paceVal(fast, normal, slow, fastMs, normalMs, slowMs) {
+        if (fast.isChecked()) return fastMs;
+        if (slow.isChecked()) return slowMs;
+        return normalMs;
+    }
     return {
         schemaVersion: 1,
         name: String(ui.strategyName.getText()),
@@ -116,7 +184,12 @@ function formValue() {
         cardPreference: cardPreference,
         preferFrontlineUnits: ui.preferFrontline.isChecked(),
         maxCardPlaysPerTurn: maxPlays,
-        maxUnitActionAttemptsPerUnit: maxUnitActions
+        maxUnitActionAttemptsPerUnit: maxUnitActions,
+        modeType: modeType,
+        cardPlayPaceMs: paceVal(ui.cardPaceFast, ui.cardPaceNormal, ui.cardPaceSlow, 350, 750, 1500),
+        unitActionPaceMs: paceVal(ui.unitPaceFast, ui.unitPaceNormal, ui.unitPaceSlow, 350, 650, 1500),
+        endTurnPaceMs: paceVal(ui.endTurnFast, ui.endTurnNormal, ui.endTurnSlow, 500, 1100, 3000),
+        navPaceMs: paceVal(ui.navFast, ui.navNormal, ui.navSlow, 800, 1800, 4000)
     };
 }
 var runner = null;
