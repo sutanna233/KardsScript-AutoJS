@@ -88,7 +88,7 @@ function create(config) {
         var p = domain.center(bounds, frame.width, frame.height);
         return touchscreenTap(p.x, p.y) ? { ok: true, detail: detail } : { ok: false, detail: "Auto.js 手势失败" };
     }
-    function tapVerifiedUi(screen, confidence, frame, ruleId) {
+    function tapVerifiedUi(screen, confidence, frame, ruleId, state) {
         if (!allowed()) return { ok: false, detail: "导航开关未启用" };
         if (confidence < config.minUiConfidence) return { ok: false, detail: "界面置信度不足" };
         // A navigation tap must be followed by a real screen transition.  Do
@@ -104,7 +104,8 @@ function create(config) {
         }
         if (navigationPending && navigationPending.key !== navigationKey) navigationPending = null;
         if (screen === "MODE_MENU") {
-            var modeTap = tap(slots.MODE_TRAINING, frame, "已在模式菜单点击训练模式");
+            var modeSlot = config.modeType === "casual" || config.modeType === "ranked" ? slots.MODE_VERSUS : slots.MODE_TRAINING;
+            var modeTap = tap(modeSlot, frame, config.modeType === "casual" || config.modeType === "ranked" ? "已在模式菜单点击对战模式" : "已在模式菜单点击训练模式");
             if (modeTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };
             return modeTap;
         }
@@ -122,6 +123,22 @@ function create(config) {
             var popupTap = tap(slots.PROMO_POPUP_CLOSE, frame, "已关闭当前促销弹窗");
             if (popupTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };
             return popupTap;
+        }
+        // 对战卡组详情页：modeType 为 casual/ranked 时先确认切换状态再点开始。
+        if (screen === "DECK_DETAIL" && (config.modeType === "casual" || config.modeType === "ranked")) {
+            var toggle = state && state.deckModeToggle;
+            if (toggle && toggle !== config.modeType) {
+                var toggleSlot = config.modeType === "ranked" ? slots.RANKED_TOGGLE : slots.CASUAL_TOGGLE;
+                var toggleTap = tap(toggleSlot, frame, "已切换至" + (config.modeType === "ranked" ? "排位" : "休闲") + "模式");
+                if (toggleTap.ok) navigationPending = { screen: screen, key: navigationKey + "/toggle", sentAt: Date.now() };
+                return toggleTap;
+            }
+            if (toggle && toggle === config.modeType) {
+                var startTap = tap(slots.DECK_START_PVP, frame, "已点击对战开始按钮");
+                if (startTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };
+                return startTap;
+            }
+            return { ok: false, detail: "排位/休闲选中状态未确认，暂不点开始" };
         }
         if (screen === "HOME") { waitingTrainingSelected = false; trainingActivated = false; }
         var slot = screen === "HOME" ? slots.HOME_START : screen === "DECK_LIST" ? slots.DECK_DEFAULT : screen === "DECK_DETAIL" ? slots.DECK_CONFIRM : screen === "MULLIGAN" ? slots.MULLIGAN_CONFIRM : screen === "RESULT" ? slots.RESULT_CONTINUE : screen === "RECONNECT" ? slots.RECONNECT : null;
@@ -229,6 +246,14 @@ function create(config) {
         }
         return result;
     }
-    return { tapVerifiedUi: tapVerifiedUi, activate: activate, tapLegalTarget: tapLegalTarget, dragUnit: dragUnit, playCard: playCard, dragCard: dragCard, endTurn: endTurn };
+    // 启动恢复路径：无需模板识别，直接向已知弹窗关闭区域发送安全点击。
+    // bounds 为归一化坐标；仅在 runtime 的启动恢复分支中调用。
+    function dismissPopup(bounds, frame) {
+        if (!allowed()) return { ok: false, detail: "导航开关未启用" };
+        if (!domain.validBounds(bounds)) return { ok: false, detail: "坐标无效" };
+        var p = domain.center(bounds, frame.width, frame.height);
+        return touchscreenTap(p.x, p.y) ? { ok: true, detail: "已点击弹窗关闭区域" } : { ok: false, detail: "弹窗关闭点击失败" };
+    }
+    return { tapVerifiedUi: tapVerifiedUi, activate: activate, tapLegalTarget: tapLegalTarget, dragUnit: dragUnit, playCard: playCard, dragCard: dragCard, endTurn: endTurn, dismissPopup: dismissPopup };
 }
 module.exports.create = create;

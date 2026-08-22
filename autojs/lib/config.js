@@ -7,6 +7,15 @@ module.exports = {
     templates: {
         trainingUnselected: "templates/mode-training-unselected-1280x720.png",
         trainingSelected: "templates/mode-training-selected-1280x720.png",
+        // 对战模式（PvP）行与排位/休闲切换、开始按钮模板。
+        // 用于 modeType: casual/ranked 路径的页面限定 findImage。
+        modeVersusSelected: "templates/buttons/mode-battle-selected.png",
+        modeVersusUnselected: "templates/buttons/mode-battle-unselected.png",
+        deckRankedSelected: "templates/buttons/deck-ranked-selected.png",
+        deckRankedUnselected: "templates/buttons/deck-ranked.png",
+        deckCasualSelected: "templates/buttons/deck-casual-selected.png",
+        deckCasualUnselected: "templates/buttons/deck-casual-unselected.png",
+        deckStartPvp: "templates/buttons/deck-start.png",
         battleOurTurn: "templates/buttons/battle-turn-ours-current.png",
         battleOurTurnWhite: "templates/buttons/battle-turn-ours-white.png",
         battleOpponentTurn: "templates/buttons/battle-turn-opponent.png",
@@ -77,6 +86,20 @@ module.exports = {
     typeMaskCandidateThreshold: 0.55,
     typeMaskMinMargin: 0.030,
     readUnitTypes: true,
+    // ── 对局模式（不可被用户策略覆盖到非法值） ──────────────────────────
+    // training=训练（AI 对战）| casual=休闲（PVP）| ranked=排位（PVP）
+    // 默认保持 training，避免误入排位消耗胜场。
+    modeType: "training",
+    // ── 节奏参数（用户可调，但有安全下限） ──────────────────────────────
+    // 用户可在策略文件中覆盖这些值，runtime 会将其钳制到安全范围。
+    // cardPlayPaceMs: 两次出牌尝试之间的最短间隔
+    // unitActionPaceMs: 两次单位操作之间的最短间隔
+    // endTurnPaceMs: 结束回合后到下一次决策的最短等待
+    // navPaceMs: 导航点击之间的最短间隔
+    cardPlayPaceMs: 750,
+    unitActionPaceMs: 650,
+    endTurnPaceMs: 1100,
+    navPaceMs: 1800,
     // Amortize expensive Auto.js template matching across frames. Unknown
     // occupied slots use unknownUnitTypeFallback immediately, while at most
     // one new concrete slot is calibrated per observation and then cached.

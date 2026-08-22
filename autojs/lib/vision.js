@@ -576,6 +576,20 @@ function detectPromoPopup(image, config) {
     return findTemplateInRegion(image, templates.popupClosePromo,
         Math.max(0.90, config.templateThreshold || 0), regions.popupClosePromo);
 }
+// 对战卡组详情页的排位/休闲选中状态。返回 "ranked" | "casual" | null。
+// 模板限定在各自实测按钮区域；两状态同时命中或都不命中时返回 null（不猜）。
+function detectDeckModeToggle(image, config) {
+    var templates = config.templates || {};
+    if (!templates.deckRankedSelected && !templates.deckCasualSelected) return null;
+    var threshold = Math.max(0.82, config.templateThreshold || 0.82);
+    var rankedOn = templates.deckRankedSelected &&
+        findTemplateInRegion(image, templates.deckRankedSelected, threshold, [0.70, 0.68, 0.86, 0.82]);
+    var casualOn = templates.deckCasualSelected &&
+        findTemplateInRegion(image, templates.deckCasualSelected, threshold, [0.82, 0.68, 0.98, 0.82]);
+    if (rankedOn && !casualOn) return "ranked";
+    if (casualOn && !rankedOn) return "casual";
+    return null;
+}
 function classifyScene(image, screen, config, detectedTurn) {
     if (screen.screen === "HOME") return { scene: "MENU", confidence: screen.confidence, ruleId: screen.ruleId };
     if (screen.screen === "MULLIGAN") return { scene: "MULLIGAN", confidence: screen.confidence, ruleId: screen.ruleId };
@@ -1706,9 +1720,10 @@ function create(config) {
                 card.playConfidence = card.playable ? clamp((card.confidence || 0) * 0.65 + pendingBadgeEvidence * 0.35, 0, 1) : 0;
             });
         }
-        return { uiScreen: uiScreen, scene: scene, width: image.getWidth(), height: image.getHeight(), state: { scene: scene.scene, uiScreen: uiScreen.screen, credits: fees.credits, hand: hand.cards, handConfidence: hand.confidence, units: frameUnits, frontlineOwner: frontline.owner, frontlineY: frontline.y, frameHeight: image.getHeight(), pending: null }, legalTargets: targets, evidence: { hand: hand.detail, credits: fees.credits, knownCardCosts: fees.knownCards, legalTargetCount: targets.length, enemyGuardMarkerCount: guardMarkers.length, frontlineOwner: frontline.owner, frontlineY: frontline.y, frontlineConfidence: frontline.confidence } };
+        var deckModeToggle = uiScreen.screen === "DECK_DETAIL" ? detectDeckModeToggle(image, config) : null;
+        return { uiScreen: uiScreen, scene: scene, width: image.getWidth(), height: image.getHeight(), state: { scene: scene.scene, uiScreen: uiScreen.screen, credits: fees.credits, hand: hand.cards, handConfidence: hand.confidence, units: frameUnits, frontlineOwner: frontline.owner, frontlineY: frontline.y, frameHeight: image.getHeight(), deckModeToggle: deckModeToggle, pending: null }, legalTargets: targets, evidence: { hand: hand.detail, credits: fees.credits, knownCardCosts: fees.knownCards, legalTargetCount: targets.length, enemyGuardMarkerCount: guardMarkers.length, frontlineOwner: frontline.owner, frontlineY: frontline.y, frontlineConfidence: frontline.confidence, deckModeToggle: deckModeToggle } };
     }
     return { observe: observe };
 }
 
-module.exports = { create: create, observe: function (image, config) { return create(config).observe(image); }, _private: { cardAt: cardAt, detectHand: detectHand, handBounds: handBounds, bottomHandCountBySpan: bottomHandCountBySpan, fanBadgePresenceScore: fanBadgePresenceScore, ocrNumber: ocrNumber, stableOcrNumber: stableOcrNumber, ocrCardCost: ocrCardCost, ocrCardCostCandidates: ocrCardCostCandidates, cardCostCandidateBounds: cardCostCandidateBounds, detectOrangeCostBadge: detectOrangeCostBadge, directCombatTargets: directCombatTargets, unitState: unitState, detectFrontlineControl: detectFrontlineControl, detectTurnTransitionBanner: detectTurnTransitionBanner, ocrHqHealth: ocrHqHealth, rgbAverage: rgbAverage, identifyCardNation: identifyCardNation, identifyCardType: identifyCardType, identifyCardRarity: identifyCardRarity, identifyCardFoil: identifyCardFoil, identifyCard: identifyCard, detectReadyState: detectReadyState, detectOrangeMoveCost: detectOrangeMoveCost, enrichHandWithFees: enrichHandWithFees, cardCostBounds: cardCostBounds, legalTargets: legalTargets, feature: feature, detectBattleTurn: detectBattleTurn, detectResultScreen: detectResultScreen, detectMulliganScreen: detectMulliganScreen, detectPromoPopup: detectPromoPopup, detectEnemyGuardMarkers: detectEnemyGuardMarkers, guardIconBounds: guardIconBounds, detectHqBounds: detectHqBounds, detectFormationHqBounds: detectFormationHqBounds, hqHeaderIdentityScore: hqHeaderIdentityScore, detectHqByHealth: detectHqByHealth, dynamicFormationUnitSlots: dynamicFormationUnitSlots, hasBlockingOverlay: hasBlockingOverlay } };
+module.exports = { create: create, observe: function (image, config) { return create(config).observe(image); }, _private: { cardAt: cardAt, detectHand: detectHand, handBounds: handBounds, bottomHandCountBySpan: bottomHandCountBySpan, fanBadgePresenceScore: fanBadgePresenceScore, ocrNumber: ocrNumber, stableOcrNumber: stableOcrNumber, ocrCardCost: ocrCardCost, ocrCardCostCandidates: ocrCardCostCandidates, cardCostCandidateBounds: cardCostCandidateBounds, detectOrangeCostBadge: detectOrangeCostBadge, directCombatTargets: directCombatTargets, unitState: unitState, detectFrontlineControl: detectFrontlineControl, detectTurnTransitionBanner: detectTurnTransitionBanner, ocrHqHealth: ocrHqHealth, rgbAverage: rgbAverage, identifyCardNation: identifyCardNation, identifyCardType: identifyCardType, identifyCardRarity: identifyCardRarity, identifyCardFoil: identifyCardFoil, identifyCard: identifyCard, detectReadyState: detectReadyState, detectOrangeMoveCost: detectOrangeMoveCost, enrichHandWithFees: enrichHandWithFees, cardCostBounds: cardCostBounds, legalTargets: legalTargets, feature: feature, detectBattleTurn: detectBattleTurn, detectResultScreen: detectResultScreen, detectMulliganScreen: detectMulliganScreen, detectPromoPopup: detectPromoPopup, detectDeckModeToggle, detectEnemyGuardMarkers: detectEnemyGuardMarkers, guardIconBounds: guardIconBounds, detectHqBounds: detectHqBounds, detectFormationHqBounds: detectFormationHqBounds, hqHeaderIdentityScore: hqHeaderIdentityScore, detectHqByHealth: detectHqByHealth, dynamicFormationUnitSlots: dynamicFormationUnitSlots, hasBlockingOverlay: hasBlockingOverlay } };
