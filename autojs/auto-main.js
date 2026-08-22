@@ -71,9 +71,8 @@ config.tickMs = 300;
 // A training opponent may spend several minutes resolving a passive board;
 // do not abort a valid BATTLE frame after the short navigation watchdog.
 config.maxSameSceneFrames = 2000;
-// The production entrypoint completes one auditable match per launch. A
-// caller can still raise targetGames in config for an explicit endurance run.
-var targetGames = config.targetGames || 1;
+// 挂机模式默认持续运行；显式 targetGames 仅用于有界测试。
+var targetGames = config.targetGames == null ? Infinity : Math.max(1, Number(config.targetGames));
 var started = Date.now(), bot = null, restartCount = 0, completedGames = 0,
     observedBattleForCurrentGame = false, observedMulliganForCurrentGame = false,
     sawSetupScreen = false, resumedCurrentGame = false;
@@ -83,14 +82,14 @@ config.actionLogger = function (action) {
 record({ event: "run-start", runId: runId, targetGames: targetGames, requireMulligan: true,
     userStrategy: activeUserStrategy, userStrategySource: loadedUserStrategy.source,
     userStrategyErrors: loadedUserStrategy.errors });
-// A real training match can exceed three minutes; keep the entrypoint alive
-// long enough to reach RESULT while runtime-level timeout guards still stop
-// disconnected/opponent-stalled sessions safely.
-while (completedGames < targetGames && Date.now() - started < 1800000) {
+// A real training match can exceed several minutes; keep the entrypoint alive
+// indefinitely for hangup use. Runtime-level safety guards still stop a
+// genuinely unrecoverable session and the outer loop starts the next game.
+while (completedGames < targetGames) {
     var analyzer = vision.create(config);
     bot = runtime.create(config);
     var lastKey = "", lastStatus = "", lastBattleEvidence = "", frameNumber = 0;
-    while (!bot.stopped() && completedGames < targetGames && Date.now() - started < 1800000) {
+    while (!bot.stopped() && completedGames < targetGames) {
         // 悬浮窗暂停：设置 __cometPaused 后跳过识别/决策/动作，仅等待。
         if (global.__cometPaused === true) { sleep(500); continue; }
         // A card play must keep the full hand geometry path enabled so the
@@ -206,6 +205,8 @@ while (completedGames < targetGames && Date.now() - started < 1800000) {
     }
     var finalStatus = bot.status();
     var recoverable = /超时|场景长时间未变化|连续动作失败/.test(finalStatus.last || "");
+    // Recoverable runtime stops restart the game; a normal RESULT stop is not
+    // terminal in hangup mode because the outer loop continues automatically.
     if (!bot.stopped() || !recoverable || restartCount >= 3) break;
     restartCount++;
     record({ t: Date.now() - started, recovery: "restart-after-runtime-stop", count: restartCount, status: finalStatus });
