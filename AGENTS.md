@@ -388,3 +388,4 @@ KardsScript/
 - 使用用户提供的红发 chibi 军装角色图制作了横向 GitHub 仓库 banner。
 - 最终资产位于 `docs/assets/kardscript-github-banner.png`，README 顶部已引用。
 - 横幅构图为左侧项目标题文字、右侧角色主体；后续替换时保留横向构图和清晰文字。
+- README 顶部醒目位置展示项目 QQ 群号 `910392625`。
