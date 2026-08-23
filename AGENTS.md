@@ -383,3 +383,8 @@ KardsScript/
 - 悬浮窗必须使用根布局 `236x84`，暂停与停止分别占据固定区域；仅调用 `setSize()` 会导致 inrt 中子布局仍按旧 `118x42` 渲染，出现只显示“暂停”的问题。
 - 当前直运行实机已验证状态链：`overlay-attached`、`overlay-paused`、`overlay-resumed`、`overlay-stopped`；截图曾暴露旧 APK 仍只显示窄版控件，因此每次布局改动必须重新打包并安装 APK 后验收。
 - 最新 APK 交付应只保留一个 Release 资产，删除旧的 optimized/controls 包，避免用户安装错误版本。
+
+## 2026-08-23 GitHub 仓库横幅
+- 使用用户提供的红发 chibi 军装角色图制作了横向 GitHub 仓库 banner。
+- 最终资产位于 `docs/assets/kardscript-github-banner.png`，README 顶部已引用。
+- 横幅构图为左侧项目标题文字、右侧角色主体；后续替换时保留横向构图和清晰文字。

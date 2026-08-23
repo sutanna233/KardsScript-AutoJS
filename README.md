@@ -2,6 +2,8 @@
 
 **KARDS 二战卡牌游戏自动对战挂机工具**
 
+![KardsScript GitHub banner](docs/assets/kardscript-github-banner.png)
+
 基于 [Auto.js6](https://github.com/SuperMonster003/AutoJs6) 运行时，通过截图像素分析 + 模板匹配实现纯视觉自动化——不依赖无障碍服务、不注入游戏内存、不需要 Root 权限。
 
 ---
