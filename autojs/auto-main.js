@@ -59,6 +59,8 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
+try { shell("am startservice -n com.kardsscript.comet/.FloatingControlService", true); } catch (overlayLaunchError) { record({ warning: "native-overlay", error: String(overlayLaunchError) }); }
+try { files.write("/sdcard/AutoJs6/KardsScript/floating-control-state.txt", "running"); } catch (_) {}
 // 悬浮窗目前先禁用，避免 Auto.js6 rawWindow 在 inrt 中出现子控件裁剪。
 // 保留 __cometPaused 状态，后续改为可靠的原生悬浮服务。
 global.__cometPaused = false;
@@ -67,6 +69,13 @@ if (typeof app !== "undefined" && app.launchPackage) {
     try { app.launchPackage(config.kardsPackage); sleep(1000); }
     catch (e) { record({ error: "launch", detail: String(e) }); }
 }
+// Packaged runners use ScriptExecuteActivity, which can remain focused as a
+// portrait shell even while MediaProjection still sees the game. Force KARDS
+// back to the foreground after the launcher has created the script engine.
+if (typeof app !== "undefined" && app.launchPackage) {
+    try { app.launchPackage(config.kardsPackage); sleep(1000); } catch (eForeground) { record({ error: "foreground-kards", detail: String(eForeground) }); }
+}
+var lastForegroundAt = 0;
 // Keep the action loop responsive enough for timed casual-mode turns while
 // retaining the runtime's two-frame hand stability and navigation guards.
 // Shorter polling keeps actions responsive while the runtime still guards
@@ -97,6 +106,11 @@ while (completedGames < targetGames) {
     while (!bot.stopped() && completedGames < targetGames) {
         // 悬浮窗暂停：设置 __cometPaused 后跳过识别/决策/动作，仅等待。
         if (global.__cometPaused === true) { sleep(500); continue; }
+        try {
+            var overlayState = files.read("/sdcard/AutoJs6/KardsScript/floating-control-state.txt");
+            if (String(overlayState).trim() === "paused") { sleep(500); continue; }
+            if (String(overlayState).trim() === "stopped") { record({ t: Date.now() - started, event: "overlay-stop-requested" }); break; }
+        } catch (_) {}
         // A card play must keep the full hand geometry path enabled so the
         // post-action count is comparable with the pre-action count.  The
         // old fast path reported the raw six-card fan while the normal path
@@ -105,6 +119,14 @@ while (completedGames < targetGames) {
         config.fastPending = !!pendingKind && pendingKind !== "PLAY_CARD";
         var frame;
         try {
+            if (typeof currentPackage === "function" && typeof app !== "undefined" && app.launchPackage) {
+                var current = currentPackage();
+                if (current && current !== config.kardsPackage && Date.now() - lastForegroundAt > 3000) {
+                    lastForegroundAt = Date.now();
+                    record({ t: Date.now() - started, event: "foreground-restore", currentPackage: current });
+                    try { app.launchPackage(config.kardsPackage); sleep(800); } catch (foregroundError) { record({ t: Date.now() - started, event: "foreground-restore-failed", error: String(foregroundError) }); }
+                }
+            }
             frame = captureScreen();
             if (!frame) { record({ t: Date.now() - started, event: "capture-empty" }); sleep(800); continue; }
             if (frame.getWidth() !== 1280 || frame.getHeight() !== 720) {
