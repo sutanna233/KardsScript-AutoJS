@@ -4,6 +4,7 @@ var base = require("./lib/config");
 var vision = require("./lib/vision");
 var runtime = require("./lib/runtime");
 var userStrategy = require("./lib/user-strategy");
+var humanize = require("./lib/humanize");
 // var floatingController = require("./lib/floating-controller"); // rawWindow 在 inrt 上仍会裁剪，暂时禁用
 var config = {};
 Object.keys(base).forEach(function (key) { config[key] = base[key]; });
@@ -268,6 +269,8 @@ while (completedGames < targetGames) {
             observation.scene.scene === "OPPONENT_TURN" ? 900 :
             ["RESULT", "HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN"].indexOf(observation.uiScreen.screen) >= 0 ? 650 : 500;
         if (observeMs > 1200) nextTick = Math.max(nextTick, 700);
+        // 拟人化：观察间隔加入 ±15% 随机扰动，避免完美等间距心跳（反脚本检测）
+        if (config.humanize && config.humanize.enabled === true) nextTick = humanize.tickInterval(nextTick);
         sleep(nextTick);
     }
     var finalStatus = bot.status();
