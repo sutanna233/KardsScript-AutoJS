@@ -393,3 +393,6 @@ KardsScript/
 ## 2026-08-23 权限说明校准
 - README 不再笼统声称项目“不依赖无障碍服务”：生产入口 `auto-main.js` 不调用 `auto.waitFor()`，使用截图权限和 `shell("input touchscreen tap ...")`；调试入口 `main.js` 会调用 `auto.waitFor()`，通常需要无障碍权限。
 - `autojs/lib/driver.js` 当前会优先通过 `su` 建立 Root shell，失败后调用 `shell(command, true)`；因此文档不能宣称自动驱动无需 Root，实际运行需要可用的 Root/特权 shell。
+
+## 2026-08-23 脚本使用风险声明
+- README 顶部必须醒目标注：使用自动化脚本有违反游戏规则、账号限制或封禁风险，用户应谨慎评估并自行承担后果；项目作者及贡献者不对封号、限制或其他损失负责。
