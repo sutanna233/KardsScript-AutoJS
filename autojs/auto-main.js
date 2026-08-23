@@ -59,7 +59,7 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
-try { shell("am startservice -n com.kardsscript.comet/.FloatingControlService", true); } catch (overlayLaunchError) { record({ warning: "native-overlay", error: String(overlayLaunchError) }); }
+try { shell("am startforegroundservice -n com.kardsscript.comet/.FloatingControlService", true); } catch (overlayLaunchError) { record({ warning: "native-notification", error: String(overlayLaunchError) }); }
 try { files.write("/sdcard/AutoJs6/KardsScript/floating-control-state.txt", "running"); } catch (_) {}
 // 悬浮窗目前先禁用，避免 Auto.js6 rawWindow 在 inrt 中出现子控件裁剪。
 // 保留 __cometPaused 状态，后续改为可靠的原生悬浮服务。
@@ -75,7 +75,7 @@ if (typeof app !== "undefined" && app.launchPackage) {
 if (typeof app !== "undefined" && app.launchPackage) {
     try { app.launchPackage(config.kardsPackage); sleep(1000); } catch (eForeground) { record({ error: "foreground-kards", detail: String(eForeground) }); }
 }
-var lastForegroundAt = 0;
+var lastForegroundAt = 0, lastOverlayStateAt = 0;
 // Keep the action loop responsive enough for timed casual-mode turns while
 // retaining the runtime's two-frame hand stability and navigation guards.
 // Shorter polling keeps actions responsive while the runtime still guards
@@ -106,11 +106,14 @@ while (completedGames < targetGames) {
     while (!bot.stopped() && completedGames < targetGames) {
         // 悬浮窗暂停：设置 __cometPaused 后跳过识别/决策/动作，仅等待。
         if (global.__cometPaused === true) { sleep(500); continue; }
-        try {
-            var overlayState = files.read("/sdcard/AutoJs6/KardsScript/floating-control-state.txt");
-            if (String(overlayState).trim() === "paused") { sleep(500); continue; }
-            if (String(overlayState).trim() === "stopped") { record({ t: Date.now() - started, event: "overlay-stop-requested" }); break; }
-        } catch (_) {}
+        if (Date.now() - lastOverlayStateAt > 500) {
+            lastOverlayStateAt = Date.now();
+            try {
+                var overlayState = files.read("/sdcard/AutoJs6/KardsScript/floating-control-state.txt");
+                if (String(overlayState).trim() === "paused") { sleep(500); continue; }
+                if (String(overlayState).trim() === "stopped") { record({ t: Date.now() - started, event: "overlay-stop-requested" }); break; }
+            } catch (_) {}
+        }
         // A card play must keep the full hand geometry path enabled so the
         // post-action count is comparable with the pre-action count.  The
         // old fast path reported the raw six-card fan while the normal path
