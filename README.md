@@ -6,7 +6,7 @@
 
 > 💬 QQ 群：**910392625**
 
-基于 [Auto.js6](https://github.com/SuperMonster003/AutoJs6) 运行时，通过截图像素分析 + 模板匹配实现纯视觉自动化——不依赖无障碍服务、不注入游戏内存、不需要 Root 权限。
+基于 [Auto.js6](https://github.com/SuperMonster003/AutoJs6) 运行时，通过截图权限获取画面，以像素分析 + 模板匹配实现纯视觉自动化；自动模式当前通过 `su`/Root shell 发送 `input touchscreen` 事件驱动 KARDS，不注入游戏进程。调试入口 `autojs/main.js` 当前会调用 `auto.waitFor()`，通常需要开启无障碍服务。
 
 ---
 
@@ -149,7 +149,7 @@ adb install -r -d CometAssistant-v1.0.0-notification.apk
    - 用于读取策略配置文件和写入运行日志
    - 路径：`/sdcard/KardsScript/user-strategy.json`
 
-> ⚠️ **重要**：彗星助手**不需要** Root 权限、**不需要**无障碍服务、**不需要**Xposed 框架。
+> ⚠️ **权限说明**：自动模式需要截图权限，并且当前驱动优先通过 `su`/Root shell 发送输入事件，因此需要设备提供可用的 Root/特权 shell；它不注入游戏进程。若运行调试入口 `autojs/main.js`，它当前会调用 `auto.waitFor()`，通常还需要开启无障碍服务。项目不需要 Xposed 框架。
 
 ---
 

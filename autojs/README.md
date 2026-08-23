@@ -8,7 +8,7 @@
 
 1. 在雷电模拟器安装适配当前 Android 版本的 Auto.js。
 2. 导入整个 `autojs/` 文件夹。调试运行 `main.js`，自动运行 `auto-main.js`。
-3. 允许无障碍和截图权限，切回 KARDS 主界面。
+3. 允许截图权限，切回 KARDS 主界面；如果运行观察入口 `main.js`，还需按 Auto.js 提示开启无障碍权限。自动入口 `auto-main.js` 不调用 `auto.waitFor()`，但当前驱动通过 `su`/Root shell 发送触控事件，需要设备提供可用的 Root/特权 shell。
 4. 在 Auto.js 控制台核对 `[页面/场景]` 日志。
 
 `lib/config.js` 的 `mode` 必须先保持 `observe`。页面分类、回合、手牌边界和合法目标探测都经实机验证前，禁止开启游戏动作。

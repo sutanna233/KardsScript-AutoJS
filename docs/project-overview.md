@@ -9,7 +9,7 @@ KardsScript 是一个 Android 端 KARDS（二战卡牌游戏）自动对战挂�
 **框架**：Auto.js6（JS 脚本运行时，运行在 AutoJS App 上）
 
 **核心特点**：
-- 不依赖无障碍服务，通过 `input touchscreen tap` 执行操作
+- 自动模式不调用无障碍服务，但当前驱动通过 `su`/Root shell 发送 `input touchscreen` 事件；调试入口 `main.js` 因调用 `auto.waitFor()` 可能需要无障碍权限
 - 纯规则+像素分析的视觉识别，不训练模型
 - JSON 决策树 DSL，用户可自定义策略
 - 合法目标必须视觉确认，不凭空生成坐标
