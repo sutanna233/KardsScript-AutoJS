@@ -45,6 +45,28 @@ var DEFAULT = {
     navPaceMs: 1800
 };
 
+function storageCandidates(preferred) {
+    var result = [], seen = {};
+    function add(path) { if (path && !seen[path]) { seen[path] = true; result.push(path); } }
+    // 旧版本公共目录在 Android 11+ 可能被分区存储拒绝；保留它作为
+    // 首选读取/迁移来源，但保存时会自动回退到应用私有目录。
+    add(preferred);
+    try {
+        if (typeof context !== "undefined" && context.getFilesDir) {
+            var privateDir = String(context.getFilesDir().getAbsolutePath());
+            add(privateDir + "/user-strategy.json");
+        }
+    } catch (_) {}
+    try {
+        if (typeof files !== "undefined" && files.cwd) add(files.join(files.cwd(), "user-strategy.json"));
+    } catch (_) {}
+    // 导入 Auto.js 项目时该目录通常可写，作为最后的兼容位置。
+    add("/sdcard/AutoJs6/KardsScript/user-strategy.json");
+    return result;
+}
+function storagePath(preferred) {
+    return storageCandidates(preferred)[0];
+}
 function copy(value) { return JSON.parse(JSON.stringify(value)); }
 function integer(value, fallback, min, max) {
     value = Number(value);
@@ -130,28 +152,34 @@ function apply(config, preferences) {
     return strategy;
 }
 function read(path) {
-    if (!path || typeof files === "undefined" || !files.exists(path)) return { preferences: copy(DEFAULT), source: "默认配置", errors: [] };
-    try {
-        var parsed = JSON.parse(files.read(path));
-        var validationErrors = errors(parsed);
-        return { preferences: validationErrors.length ? copy(DEFAULT) : normalize(parsed), source: path, errors: validationErrors };
-    } catch (e) { return { preferences: copy(DEFAULT), source: "默认配置", errors: ["读取配置失败: " + e] }; }
+    if (typeof files === "undefined") return { preferences: copy(DEFAULT), source: "默认配置", errors: [] };
+    var candidates = storageCandidates(path), lastError = null;
+    for (var i = 0; i < candidates.length; i++) {
+        if (!files.exists(candidates[i])) continue;
+        try {
+            var parsed = JSON.parse(files.read(candidates[i]));
+            var validationErrors = errors(parsed);
+            return { preferences: validationErrors.length ? copy(DEFAULT) : normalize(parsed), source: candidates[i], errors: validationErrors };
+        } catch (e) { lastError = e; }
+    }
+    return { preferences: copy(DEFAULT), source: "默认配置", errors: lastError ? ["读取配置失败: " + lastError] : [] };
 }
 function write(path, preferences) {
     var validationErrors = errors(preferences);
     if (validationErrors.length) return { ok: false, errors: validationErrors };
-    if (!path || typeof files === "undefined") return { ok: false, errors: ["当前环境不支持文件保存"] };
-    try {
-        // Auto.js6 does not provide files.getDir(). Keep this independent of
-        // its optional path helpers so the same configuration path works in
-        // both imported projects and packaged APKs.
-        // Auto.js treats ensureDir's argument as a target file path and
-        // creates its parent directory. Passing only the directory causes
-        // it to ensure /sdcard instead of /sdcard/KardsScript.
-        files.ensureDir(path);
-        files.write(path, JSON.stringify(normalize(preferences), null, 2));
-        return { ok: true, preferences: normalize(preferences) };
-    } catch (e) { return { ok: false, errors: ["保存配置失败: " + e] }; }
+    if (typeof files === "undefined") return { ok: false, errors: ["当前环境不支持文件保存"] };
+    var payload = JSON.stringify(normalize(preferences), null, 2), candidates = storageCandidates(path), failures = [];
+    for (var i = 0; i < candidates.length; i++) {
+        try {
+            // Android 11+ may reject the legacy public /sdcard/KardsScript path
+            // with EPERM. Try it for backward compatibility, then fall back to
+            // the app-private files directory or the imported project directory.
+            files.ensureDir(candidates[i]);
+            files.write(candidates[i], payload);
+            return { ok: true, path: candidates[i], preferences: normalize(preferences) };
+        } catch (e) { failures.push(candidates[i] + ": " + e); }
+    }
+    return { ok: false, errors: ["保存配置失败：所有可写目录均被拒绝", failures.join("\n")] };
 }
 
 module.exports = { DEFAULT: DEFAULT, SAFE: SAFE, PACE_MIN: PACE_MIN, PACE_MAX: PACE_MAX, errors: errors, normalize: normalize, toDecisionTree: toDecisionTree, apply: apply, read: read, write: write };
