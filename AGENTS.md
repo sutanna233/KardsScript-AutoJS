@@ -78,6 +78,7 @@ Android 端 KARDS（二战卡牌游戏）自动对战挂机工具。基于 **Aut
 - 工作目录：`J:\dev\KardsScript`
 - AutoJS 项目目录：`J:\dev\KardsScript\autojs\`
 - 运行方式：在雷电模拟器安装 Auto.js6，导入 `autojs/` 目录，运行 `main.js`
+- 雷电模拟器版本：9（64 位）；模拟机型必须设置为 Xiaomi 15 Pro（Xiaomi 15PRO）
 - 雷电模拟器 ADB：`127.0.0.1:5555`
 - KARDS 包名：`com.android1939.kardsapk`
 - 模拟器分辨率：1280x720（横屏，游戏内）

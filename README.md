@@ -80,6 +80,7 @@ J:\dev\KardsScript\CometAssistant-v1.0.0-notification.apk
 
 2. **安装并配置模拟器**
    - 打开雷电模拟器后，进入「设置」→「其他设置」
+   - 模拟机型必须设置为 **Xiaomi 15 Pro**（Xiaomi 15PRO）
    - 分辨率设置：选择 `1280×720`（横屏），或在自定义分辨率中手动输入
    - 性能设置：CPU 2核 + 内存 4GB 足够运行 KARDS + 彗星助手
    - 开启 ADB 调试：设置 → 其他设置 → 开启「ADB调试」（默认已开启）
@@ -173,6 +174,7 @@ adb install -r -d CometAssistant-v1.0.0-notification.apk
 | 配置项 | 推荐值 |
 |--------|--------|
 | 模拟器 | 雷电模拟器 9.x（64位） |
+| 模拟机型 | Xiaomi 15 Pro（Xiaomi 15PRO） |
 | 模拟器分辨率 | 1280×720 |
 | 模拟器性能 | 2核 CPU + 4GB RAM |
 | 操作系统 | Windows 10/11（用于 ADB 调试） |
