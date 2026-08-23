@@ -561,5 +561,8 @@ module.exports.create = function (config) {
     if (planner.validationErrors.length) log("决策树无效，已使用安全内置策略");
     return { tick: tick, stopped: function () { return stopped; }, stop: function () { stopped = true; },
         pendingAction: function () { return pending ? pending.action : null; },
-        status: function () { return { last: last, pending: pending ? pending.action : null, failures: failures, playAttempts: playAttempts, unitAttempts: unitAttempts, skippedCardPlay: skippedCardPlay }; }, decisionTree: function () { return { source: planner.source, errors: planner.validationErrors.slice() }; } };
+        status: function () { return { last: last, pending: pending ? pending.action : null,
+            pendingAgeMs: pending && pending.sentAt ? Date.now() - pending.sentAt : 0,
+            failures: failures, playAttempts: playAttempts, unitAttempts: unitAttempts,
+            skippedCardPlay: skippedCardPlay }; }, decisionTree: function () { return { source: planner.source, errors: planner.validationErrors.slice() }; } };
 };
