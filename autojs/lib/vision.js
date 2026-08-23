@@ -282,7 +282,7 @@ function detectHqBounds(image, isEnemy, config) {
         });
         return penalty;
     }
-    for (var y = y0; y <= y1 - 0.20; y += 0.02) for (var x = 0.18; x <= 0.82; x += 0.015) {
+    for (var y = y0; y <= y1 - 0.20; y += 0.04) for (var x = 0.18; x <= 0.82; x += 0.03) {
         var b = [x, y, x + 0.085, y + 0.20], f = feature(image, b, 10), border = borderContrast(b);
         // Do not assume the HQ is centred: some boards place it beside a
         // command unit. Only a very small penalty suppresses totally remote
@@ -328,7 +328,7 @@ function detectFormationHqBounds(image, isEnemy) {
         return hits / Math.max(1, count) * 4 + sum / Math.max(1, count) / 255;
     }
     yStarts.forEach(function (y) {
-        for (var x = 0.20; x <= 0.78; x += 0.005) {
+        for (var x = 0.20; x <= 0.78; x += 0.01) {
             var bounds = [x, y, x + width, y + height];
             candidates.push({ x: x, y: y, bounds: bounds, score: borderScore(bounds) });
         }
@@ -1034,7 +1034,7 @@ function enrichHandWithFees(image, hand, config) {
     // hand into an unconditional END_TURN, while keeping the normal cadence
     // throttled by the caller.
     if (config.readCardCosts !== false && !knownCards && hand.cards.length) {
-        if (typeof sleep === "function") sleep(500);
+        if (typeof sleep === "function") sleep(120);
         readCosts(hand.cards);
     }
     return { credits: credits, knownCards: knownCards };

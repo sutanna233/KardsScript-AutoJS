@@ -89,8 +89,12 @@ var started = Date.now(), bot = null, restartCount = 0, consecutiveRecoveries = 
     gamePhase = "IDLE", gameSessionId = null,
     observedBattleForCurrentGame = false, observedMulliganForCurrentGame = false,
     sawSetupScreen = false, resumedCurrentGame = false;
+var lastActionAt = 0;
 config.actionLogger = function (action) {
-    record({ t: Date.now() - started, event: "driver-action", action: action });
+    var now = Date.now(), previous = lastActionAt;
+    lastActionAt = now;
+    record({ t: now - started, event: "driver-action", action: action,
+        sincePreviousActionMs: previous ? now - previous : null });
 };
 record({ event: "run-start", runId: runId, targetGames: targetGames, requireMulligan: true,
     userStrategy: activeUserStrategy, userStrategySource: loadedUserStrategy.source,
@@ -143,7 +147,7 @@ while (completedGames < targetGames) {
         }
         var observeStarted = Date.now(), observation = analyzer.observe(frame), observeMs = Date.now() - observeStarted;
         frameNumber++;
-        if (frameNumber === 1 || frameNumber % 10 === 0) record({ t: Date.now() - started, performance: true, frame: frameNumber, observeMs: observeMs });
+        if (frameNumber === 1 || frameNumber % 10 === 0) record({ t: Date.now() - started, performance: true, frame: frameNumber, observeMs: observeMs, screen: observation.uiScreen.screen, scene: observation.scene.scene, pending: bot.pendingAction ? bot.pendingAction() : null });
         // In automatic mode the orange/grey badge is the authoritative live
         // affordability signal. Normalize any cached/OCR branch back to it
         // before the decision tree and runtime inspect the hand.

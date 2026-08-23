@@ -96,19 +96,19 @@ module.exports = {
     // unitActionPaceMs: 两次单位操作之间的最短间隔
     // endTurnPaceMs: 结束回合后到下一次决策的最短等待
     // navPaceMs: 导航点击之间的最短间隔
-    cardPlayPaceMs: 750,
-    unitActionPaceMs: 650,
-    endTurnPaceMs: 1100,
-    navPaceMs: 1800,
+    cardPlayPaceMs: 600,
+    unitActionPaceMs: 500,
+    endTurnPaceMs: 800,
+    navPaceMs: 1200,
     // ── 内部超时参数（由节奏参数推导，不直接暴露给用户） ────────────────
     // 这些值由 pace 参数驱动：快节奏 → 短超时，慢节奏 → 长超时。
     // 不直接在用户策略中暴露，避免破坏确认逻辑。
-    playCardSettleMs: 750,
-    playCardConfirmTimeoutMs: 2400,
-    deploymentSettleWaitMs: 550,
+    playCardSettleMs: 400,
+    playCardConfirmTimeoutMs: 1600,
+    deploymentSettleWaitMs: 400,
     unitDragDurationMs: 650,
-    unitActionConfirmTimeoutMs: 10000,
-    endTurnSettleMs: 1100,
+    unitActionConfirmTimeoutMs: 4500,
+    endTurnSettleMs: 800,
     // Amortize expensive Auto.js template matching across frames. Unknown
     // occupied slots use unknownUnitTypeFallback immediately, while at most
     // one new concrete slot is calibrated per observation and then cached.
@@ -135,17 +135,17 @@ module.exports = {
     tickMs: 300,
     // End-turn input is acknowledged before the UI always redraws.  Keep one
     // request in flight rather than tapping the fixed button every frame.
-    endTurnSettleMs: 1100,
-    playCardSettleMs: 750,
+    endTurnSettleMs: 800,
+    playCardSettleMs: 400,
     // A hand decrease must persist for two stable observations. This timeout
     // bounds that transaction without accepting a one-frame fan-count wobble.
     // One battle observation currently costs about 1.2-1.4s on the emulator.
     // Two frames are enough to reject a dead drag; waiting five seconds per
     // lane consumed most of a timed turn while repeating the same bad source.
-    playCardConfirmTimeoutMs: 2400,
+    playCardConfirmTimeoutMs: 1600,
     // Maximum wait after selecting a card for the game to illuminate a legal
     // deployment slot. A zero value is useful for deterministic replay tests.
-    deploymentSettleWaitMs: 550,
+    deploymentSettleWaitMs: 400,
     // Unit drags need a slower hold than card deployment on the Unreal board;
     // the game otherwise interprets the gesture as a tap near the source.
     unitDragDurationMs: 650,
@@ -153,7 +153,7 @@ module.exports = {
     // full Auto.js observation can take 6–8 seconds. The gesture is sent
     // immediately; this window only prevents a successful move from being
     // declared failed before that complete frame arrives.
-    unitActionConfirmTimeoutMs: 10000,
+    unitActionConfirmTimeoutMs: 4500,
     // User hard limit: no more than two movement/attack gestures in one
     // player turn, including retries.
     // Retry ceiling is per physical unit/action, not a whole-turn action cap.
@@ -167,7 +167,7 @@ module.exports = {
     // User limit: at most three card drags per turn. After the third
     // unconfirmed attempt, preserve the remaining timed turn for unit
     // actions and then end safely instead of sweeping every board lane.
-    maxPlayAttemptsPerTurn: 3,
+    maxPlayAttemptsPerTurn: 2,
     // Keep this mode until the complete observe-only pass is reviewed.
     mode: "observe",
     allowNavigation: false,

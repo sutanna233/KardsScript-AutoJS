@@ -99,7 +99,7 @@ function create(config) {
         if (navigationPending && navigationPending.key === navigationKey) {
             var age = Date.now() - navigationPending.sentAt;
             if (age < navPace) return { ok: true, detail: "等待导航页面切换" };
-            if (age < navPace * 3.9) return { ok: true, detail: "等待导航页面确认" };
+            if (age < navPace * 2.8) return { ok: true, detail: "等待导航页面确认" };
             navigationPending = null;
             return { ok: false, detail: "导航点击后页面未切换: " + screen };
         }

@@ -39,10 +39,10 @@ var DEFAULT = {
     maxCardPlaysPerTurn: 3,
     maxUnitActionAttemptsPerUnit: 2,
     modeType: "training",
-    cardPlayPaceMs: 750,
-    unitActionPaceMs: 650,
-    endTurnPaceMs: 1100,
-    navPaceMs: 1800
+    cardPlayPaceMs: 600,
+    unitActionPaceMs: 500,
+    endTurnPaceMs: 800,
+    navPaceMs: 1200
 };
 
 function storageCandidates(preferred) {

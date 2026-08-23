@@ -5,10 +5,10 @@ var defaults = userStrategy.normalize({});
 assert.deepStrictEqual(defaults.actionOrder, ["OPERATE_UNIT", "PLAY_CARD", "END_TURN"]);
 assert.strictEqual(defaults.preferFrontlineUnits, true);
 assert.strictEqual(defaults.modeType, "training");
-assert.strictEqual(defaults.cardPlayPaceMs, 750);
-assert.strictEqual(defaults.unitActionPaceMs, 650);
-assert.strictEqual(defaults.endTurnPaceMs, 1100);
-assert.strictEqual(defaults.navPaceMs, 1800);
+assert.strictEqual(defaults.cardPlayPaceMs, 600);
+assert.strictEqual(defaults.unitActionPaceMs, 500);
+assert.strictEqual(defaults.endTurnPaceMs, 800);
+assert.strictEqual(defaults.navPaceMs, 1200);
 
 var invalid = userStrategy.errors({ schemaVersion: 1, actionOrder: ["PLAY_CARD"], maxCardPlaysPerTurn: 8 });
 assert.ok(invalid.some(function (message) { return message.indexOf("END_TURN") >= 0; }));
