@@ -4,7 +4,7 @@
 // preferences, then launches the proven automatic runner as a separate
 // engine so the configuration screen stays responsive.
 var userStrategy = require("./lib/user-strategy");
-var STRATEGY_PATH = "/sdcard/AutoJs6/KardsScript/user-strategy.json";
+var STRATEGY_PATH = "/sdcard/KardsScript/user-strategy.json";
 var loaded = userStrategy.read(STRATEGY_PATH);
 var current = loaded.preferences;
 
@@ -210,7 +210,7 @@ function save() {
     if (!result.ok) { ui.validation.setText(result.errors.join("\n")); return false; }
     current = result.preferences;
     ui.validation.setText("");
-    ui.status.setText("已保存到 " + STRATEGY_PATH);
+    ui.status.setText("已保存配置" + (result.path ? "（应用私有目录）" : ""));
     return true;
 }
 function startRunner() {

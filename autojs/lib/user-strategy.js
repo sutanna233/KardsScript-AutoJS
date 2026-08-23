@@ -48,9 +48,8 @@ var DEFAULT = {
 function storageCandidates(preferred) {
     var result = [], seen = {};
     function add(path) { if (path && !seen[path]) { seen[path] = true; result.push(path); } }
-    // 旧版本公共目录在 Android 11+ 可能被分区存储拒绝；保留它作为
-    // 首选读取/迁移来源，但保存时会自动回退到应用私有目录。
-    add(preferred);
+    // Android 11+ blocks arbitrary public folders for many Auto.js packages.
+    // Prefer the app-private directory so saving never depends on storage permission.
     try {
         if (typeof context !== "undefined" && context.getFilesDir) {
             var privateDir = String(context.getFilesDir().getAbsolutePath());
@@ -60,12 +59,13 @@ function storageCandidates(preferred) {
     try {
         if (typeof files !== "undefined" && files.cwd) add(files.join(files.cwd(), "user-strategy.json"));
     } catch (_) {}
-    // 导入 Auto.js 项目时该目录通常可写，作为最后的兼容位置。
     add("/sdcard/AutoJs6/KardsScript/user-strategy.json");
+    add(preferred);
     return result;
 }
-function storagePath(preferred) {
-    return storageCandidates(preferred)[0];
+function getDefaultPath() {
+    var candidates = storageCandidates("");
+    return candidates.length ? candidates[0] : "/sdcard/AutoJs6/KardsScript/user-strategy.json";
 }
 function copy(value) { return JSON.parse(JSON.stringify(value)); }
 function integer(value, fallback, min, max) {
