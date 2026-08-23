@@ -59,7 +59,6 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
-try { shell("am startforegroundservice -n com.kardsscript.comet/.FloatingControlService", true); } catch (overlayLaunchError) { record({ warning: "native-notification", error: String(overlayLaunchError) }); }
 try { files.write("/sdcard/AutoJs6/KardsScript/floating-control-state.txt", "running"); } catch (_) {}
 // 悬浮窗目前先禁用，避免 Auto.js6 rawWindow 在 inrt 中出现子控件裁剪。
 // 保留 __cometPaused 状态，后续改为可靠的原生悬浮服务。
