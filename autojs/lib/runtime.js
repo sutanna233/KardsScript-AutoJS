@@ -1,6 +1,7 @@
 var domain = require("./domain");
 var strategy = require("./strategy");
 var driverModule = require("./driver");
+var humanize = require("./humanize");
 
 module.exports.create = function (config) {
     var stopped = false, last = "", same = 0, signature = "", pending = null, failures = 0, endTurnRequestedAt = 0, deploymentCursor = 0, failedDeploymentSlots = {}, skippedCardPlay = false, handSignature = "", handStable = 0, blockedCardIds = {}, blockedUnitIds = {}, blockedUnitBounds = {}, unitActionRetries = {}, unitAttempts = 0, playAttempts = 0, opponentTurnSince = 0;
@@ -173,6 +174,14 @@ module.exports.create = function (config) {
         // (or another confirmed action) while kredits and turn time remain.
         if (action === domain.Action.MOVE_TO_FRONTLINE && !sharedFrontlineTarget(state)) return null;
         return { kind: action, sourceId: sourceUnit.id, confidence: sourceUnit.confidence || 0.65 };
+    }
+    // 拟人化：战斗动作前模拟"看局面→做决定"的延迟
+    var hzEnabled = config.humanize && config.humanize.enabled;
+    function thinkBeforeAction() {
+        if (!hzEnabled) return;
+        var base = (config.humanize.thinkTimeBaseMs || 400);
+        var delay = humanize.thinkTime(base);
+        if (delay > 0 && typeof sleep === "function") sleep(delay);
     }
     function execute(observation) {
         var state = observation.state;
@@ -407,6 +416,7 @@ module.exports.create = function (config) {
                     else return log("没有确认的空闲部署位，暂不拖牌");
                 } else {
                     var deploymentSlot = currentDeploymentSlots[deploymentIndex];
+                    thinkBeforeAction();
                     var played = driver.playCard(card, deploymentSlot, observation.frame, observation.state, playAttempts);
                     if (!played.ok) return fail(played);
                     pending = {
@@ -435,6 +445,7 @@ module.exports.create = function (config) {
             // press on the unit, drag to the destination, release. A separate
             // preliminary tap can open/select the card and make the following
             // drag originate from stale UI state.
+            thinkBeforeAction();
             var moveSent = driver.dragUnit(rear, frontlineTarget, observation.frame);
             if (!moveSent.ok) return fail(moveSent);
             unitAttempts++;
@@ -456,6 +467,7 @@ module.exports.create = function (config) {
             var attackTarget = planner.chooseTarget(observation.legalTargets || [], domain.Action.ATTACK, attacker);
             if (!attackTarget) return log("未检测到当前帧敌方合法攻击目标");
             if (attackTarget.kind !== "ENEMY_UNIT" && attackTarget.kind !== "ENEMY_HQ") return log("攻击目标不是敌方目标，已拦截");
+            thinkBeforeAction();
             var attackSent = driver.dragUnit(attacker, attackTarget, observation.frame);
             if (!attackSent.ok) return fail(attackSent);
             unitAttempts++;

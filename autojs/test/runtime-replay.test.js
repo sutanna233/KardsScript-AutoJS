@@ -23,6 +23,8 @@ config.endTurnSettleMs = 60000;
 // Most unit-level replay cases exercise one transaction directly. Keep them
 // single-frame and cover the production two-frame gate in a dedicated case.
 config.minStableHandFrames = 1;
+// 回放测试验证精确坐标校准（806/518/674 等），关闭拟人化抖动以保证确定性。
+config.humanize = { enabled: false, tapJitterRadius: 8, swipeJitterRadius: 6, paceVariance: 0.35, thinkTimeBaseMs: 50 };
 
 function observation(screen, scene, state, legalTargets) {
     return {

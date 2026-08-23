@@ -1,5 +1,6 @@
 var domain = require("./domain");
 var slots = require("./coordinates");
+var humanize = require("./humanize");
 
 function create(config) {
     var waitingTrainingSelected = false, trainingActivated = false, navigationPending = null;
@@ -63,6 +64,14 @@ function create(config) {
             try { shell(command, true); return true; } catch (e3) { return false; }
         }
     }
+    // ─── 拟人化参数（从 config.humanize 读取，enabled=false 时退化为原始行为）───
+    // 以 config 为唯一开关：同步模块级标志，使 driver 内所有 humanize.enabled
+    // 检查与当前实例配置一致（回归测试可设 config.humanize.enabled=false）。
+    var hzEnabled = config.humanize && config.humanize.enabled === true;
+    humanize.enabled = hzEnabled;
+    var hzTapRadius = (config.humanize && config.humanize.tapJitterRadius) || 8;
+    var hzSwipeRadius = (config.humanize && config.humanize.swipeJitterRadius) || 6;
+
     function touchscreenTap(x, y) {
         // KARDS is an Unreal game. Accessibility press() may report success
         // without delivering the event, while this input source is verified
@@ -71,12 +80,26 @@ function create(config) {
             // Unreal ignored a synthetic zero-duration tap on the result
             // overlay in real-device testing. A one-pixel touchscreen swipe
             // produces the same click gesture and is accepted consistently.
-            return dispatchRootInput("input touchscreen swipe " + x + " " + y + " " + (x + 1) + " " + (y + 1) + " 120");
+            // 拟人化：按压时长随机化（60~200ms），坐标抖动由调用方传入
+            var tapMs = humanize.enabled ? humanize.tapDuration() : 120;
+            return dispatchRootInput("input touchscreen swipe " + x + " " + y + " " + (x + 1) + " " + (y + 1) + " " + tapMs);
         }
         return press(x, y, 1);
     }
     function touchscreenSwipe(from, to, duration) {
-        var swipeMs = Math.max(180, Math.min(650, Math.round(duration || 420)));
+        var swipeMs;
+        if (humanize.enabled) {
+            // 拟人化：端点加偏移 + 时长随机化
+            var start = humanize.jitterStart(from.x, from.y, hzSwipeRadius);
+            var end = humanize.jitterEnd(to.x, to.y, hzSwipeRadius);
+            var dist = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));
+            swipeMs = humanize.swipeDuration(dist, duration || 450);
+            if (typeof shell === "function") {
+                return dispatchRootInput("input touchscreen swipe " + start.x + " " + start.y + " " + end.x + " " + end.y + " " + swipeMs);
+            }
+            return swipe(start.x, start.y, end.x, end.y, swipeMs);
+        }
+        swipeMs = Math.max(180, Math.min(650, Math.round(duration || 420)));
         if (typeof shell === "function") {
             return dispatchRootInput("input touchscreen swipe " + from.x + " " + from.y + " " + to.x + " " + to.y + " " + swipeMs);
         }
@@ -86,6 +109,10 @@ function create(config) {
         if (!foreground()) return { ok: false, detail: "KARDS 不在前台" };
         if (!domain.validBounds(bounds)) return { ok: false, detail: "坐标无效" };
         var p = domain.center(bounds, frame.width, frame.height);
+        // 拟人化：根据目标尺寸自适应抖动（小按钮自动缩小半径）
+        if (humanize.enabled) {
+            p = humanize.jitterTapAdaptive(p.x, p.y, bounds, frame.width, frame.height, hzTapRadius);
+        }
         return touchscreenTap(p.x, p.y) ? { ok: true, detail: detail } : { ok: false, detail: "Auto.js 手势失败" };
     }
     function tapVerifiedUi(screen, confidence, frame, ruleId, state) {
@@ -95,7 +122,8 @@ function create(config) {
         // not fire the same tap every 750ms while Unreal is still animating;
         // abandon it after a bounded wait so a dead click cannot cascade.
         var navigationKey = screen + "/" + (ruleId || "");
-        var navPace = config.navPaceMs || 1800;
+        // 拟人化：导航节奏加入随机变异，避免完美等间距
+        var navPace = humanize.enabled ? humanize.humanDelay(config.navPaceMs || 1800, 0.30) : (config.navPaceMs || 1800);
         if (navigationPending && navigationPending.key === navigationKey) {
             var age = Date.now() - navigationPending.sentAt;
             if (age < navPace) return { ok: true, detail: "等待导航页面切换" };
@@ -260,6 +288,9 @@ function create(config) {
         if (!allowed()) return { ok: false, detail: "导航开关未启用" };
         if (!domain.validBounds(bounds)) return { ok: false, detail: "坐标无效" };
         var p = domain.center(bounds, frame.width, frame.height);
+        if (humanize.enabled) {
+            p = humanize.jitterTapAdaptive(p.x, p.y, bounds, frame.width, frame.height, hzTapRadius);
+        }
         return touchscreenTap(p.x, p.y) ? { ok: true, detail: "已点击弹窗关闭区域" } : { ok: false, detail: "弹窗关闭点击失败" };
     }
     return { tapVerifiedUi: tapVerifiedUi, activate: activate, tapLegalTarget: tapLegalTarget, dragUnit: dragUnit, playCard: playCard, dragCard: dragCard, endTurn: endTurn, dismissPopup: dismissPopup };

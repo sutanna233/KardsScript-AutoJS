@@ -56,9 +56,25 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - `autojs/lib/vision.js`：页面、回合、手牌、单位和目标识别。
 - `autojs/lib/decision.js`：声明式 JSON 决策树 DSL，不执行用户任意代码。
 - `autojs/lib/strategy.js`：卡牌/单位选择和目标排序。
-- `autojs/lib/driver.js`：唯一输入驱动入口。
-- `autojs/lib/runtime.js`：场景状态机、动作握手和失败恢复。
+- `autojs/lib/driver.js`：唯一输入驱动入口；接入拟人化（自适应 tap 抖动、swipe 端点变异、时长随机化、导航节奏扰动）。
+- `autojs/lib/runtime.js`：场景状态机、动作握手和失败恢复；战斗动作前调用拟人化思考延迟。
+- `autojs/lib/humanize.js`：拟人化 / 反脚本检测层（三角分布坐标抖动、时间变异、思考延迟、tick 扰动）；纯同步、零额外 shell 调用。
 - `autojs/strategy/`：用户可编辑策略；`autojs/templates/`：页面专用模板。
+
+## 拟人化 / 反脚本检测（humanize）
+
+目标：让输入行为在统计特征上接近真人，降低可检测信号（固定坐标、等间距动作、直线固定时长拖拽、零反应延迟）。
+
+- **总开关**：`config.humanize.enabled`（默认 `true`；设 `false` 退化为原始固定行为，用于回归测试）。driver 在 `create()` 时以 config 为唯一开关同步模块级标志。
+- **坐标抖动（自适应）**：tap 偏移半径 = `min(tapJitterRadius, 目标最小边像素 × 0.12)`，下限 2px。大按钮（187px）→ 8px，小按钮（48px）→ 5px，极小目标（35px）→ 4px。用三角分布（两次随机求和）近似正态，95% 偏移落在 ±3px 内。
+- **swipe 端点抖动**：起点 `swipeJitterRadius`(默认 5) / 终点(默认 7) 各自加偏移；时长按距离随机化（120~900ms）。
+- **tap 按压时长**：随机 60~200ms（原固定 120ms）。
+- **思考延迟**：战斗动作（出牌/移动/攻击）前插入 `thinkTimeBaseMs`(默认 50ms) 比例的随机延迟，偶发 8% 长停顿模拟犹豫。
+- **tick 扰动**：主循环观察间隔加入 ±15% 随机变化，避免完美等间距心跳。
+- **导航节奏**：`navPaceMs` 加入 ±30% 随机变异。
+- **用户可配**：`user-strategy.json` 的 `humanize` 对象（enabled / tapJitterRadius 2~20 / swipeJitterRadius 2~15 / paceVariance 0.1~0.6 / thinkTimeBaseMs 20~2000）。
+- **覆盖范围**：所有 tap（导航/单位/目标/结束回合/弹窗）走 `tap()` 自适应抖动；所有拖拽（出牌/攻击/移动）走 swipe 端点抖动 + 时长随机化。
+- **测试**：`autojs/test/humanize.test.js`（32 项，含三角分布中心密度验证）；`runtime-replay.test.js` 关闭拟人化以保持坐标断言确定性。
 
 ## 当前已知限制
 

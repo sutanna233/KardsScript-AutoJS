@@ -30,6 +30,13 @@ var PACE_MAX = {
     endTurnPaceMs: 10000,
     navPaceMs: 10000
 };
+var HUMANIZE_DEFAULT = {
+    enabled: true,
+    tapJitterRadius: 8,
+    swipeJitterRadius: 6,
+    paceVariance: 0.35,
+    thinkTimeBaseMs: 50
+};
 var DEFAULT = {
     schemaVersion: 1,
     name: "基础策略",
@@ -42,7 +49,8 @@ var DEFAULT = {
     cardPlayPaceMs: 600,
     unitActionPaceMs: 500,
     endTurnPaceMs: 800,
-    navPaceMs: 1200
+    navPaceMs: 1200,
+    humanize: copy(HUMANIZE_DEFAULT)
 };
 
 function storageCandidates(preferred) {
@@ -101,6 +109,18 @@ function errors(value) {
             result.push(field + " 必须在 " + PACE_MIN[field] + " 到 " + PACE_MAX[field] + " 毫秒之间");
         }
     });
+    // 拟人化参数验证
+    if (value.humanize != null) {
+        var hz = value.humanize;
+        if (typeof hz !== "object" || hz === null) result.push("humanize 必须是对象");
+        else {
+            if (hz.enabled != null && typeof hz.enabled !== "boolean") result.push("humanize.enabled 必须是布尔值");
+            if (hz.tapJitterRadius != null && (!isFinite(Number(hz.tapJitterRadius)) || Number(hz.tapJitterRadius) < 2 || Number(hz.tapJitterRadius) > 20)) result.push("humanize.tapJitterRadius 必须是 2~20 的整数");
+            if (hz.swipeJitterRadius != null && (!isFinite(Number(hz.swipeJitterRadius)) || Number(hz.swipeJitterRadius) < 2 || Number(hz.swipeJitterRadius) > 15)) result.push("humanize.swipeJitterRadius 必须是 2~15 的整数");
+            if (hz.paceVariance != null && (!isFinite(Number(hz.paceVariance)) || Number(hz.paceVariance) < 0.1 || Number(hz.paceVariance) > 0.6)) result.push("humanize.paceVariance 必须在 0.1~0.6 之间");
+            if (hz.thinkTimeBaseMs != null && (!isFinite(Number(hz.thinkTimeBaseMs)) || Number(hz.thinkTimeBaseMs) < 20 || Number(hz.thinkTimeBaseMs) > 2000)) result.push("humanize.thinkTimeBaseMs 必须是 20~2000 毫秒");
+        }
+    }
     return result;
 }
 function normalize(value) {
@@ -116,6 +136,16 @@ function normalize(value) {
     ["cardPlayPaceMs", "unitActionPaceMs", "endTurnPaceMs", "navPaceMs"].forEach(function (field) {
         result[field] = integer(value[field], result[field], PACE_MIN[field], PACE_MAX[field]);
     });
+    // 拟人化参数：逐项覆盖，未提供的保持默认
+    if (value.humanize && typeof value.humanize === "object") {
+        var hz = value.humanize, def = result.humanize || copy(HUMANIZE_DEFAULT);
+        if (typeof hz.enabled === "boolean") def.enabled = hz.enabled;
+        if (isFinite(Number(hz.tapJitterRadius))) def.tapJitterRadius = integer(hz.tapJitterRadius, def.tapJitterRadius, 2, 20);
+        if (isFinite(Number(hz.swipeJitterRadius))) def.swipeJitterRadius = integer(hz.swipeJitterRadius, def.swipeJitterRadius, 2, 15);
+        if (isFinite(Number(hz.paceVariance))) def.paceVariance = Math.max(0.1, Math.min(0.6, Number(hz.paceVariance)));
+        if (isFinite(Number(hz.thinkTimeBaseMs))) def.thinkTimeBaseMs = integer(hz.thinkTimeBaseMs, def.thinkTimeBaseMs, 20, 2000);
+        result.humanize = def;
+    }
     return result;
 }
 function actionNode(kind) {
@@ -147,6 +177,7 @@ function apply(config, preferences) {
     config.unitActionPaceMs = strategy.unitActionPaceMs;
     config.endTurnPaceMs = strategy.endTurnPaceMs;
     config.navPaceMs = strategy.navPaceMs;
+    config.humanize = strategy.humanize || copy(HUMANIZE_DEFAULT);
     // 安全项：无论用户策略如何配置，这些保护值始终从 SAFE 强制写入。
     Object.keys(SAFE).forEach(function (key) { config[key] = SAFE[key]; });
     return strategy;

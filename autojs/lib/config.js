@@ -100,6 +100,19 @@ module.exports = {
     unitActionPaceMs: 500,
     endTurnPaceMs: 800,
     navPaceMs: 1200,
+    // ── 拟人化 / 反脚本检测参数 ──────────────────────────────────────────────
+    // enabled=false 时所有偏移和延迟退化为原始固定值（用于回归测试）。
+    // tapJitterRadius: tap 坐标最大偏移像素（8px 不会点错 50px+ 的按钮）
+    // swipeJitterRadius: swipe 端点最大偏移像素
+    // paceVariance: 节奏参数随机变异比例（0.35 = ±35%）
+    // thinkTimeBaseMs: 战斗动作前基准思考时间（模拟人看局面）
+    humanize: {
+        enabled: true,
+        tapJitterRadius: 8,
+        swipeJitterRadius: 6,
+        paceVariance: 0.35,
+        thinkTimeBaseMs: 50
+    },
     // ── 内部超时参数（由节奏参数推导，不直接暴露给用户） ────────────────
     // 这些值由 pace 参数驱动：快节奏 → 短超时，慢节奏 → 长超时。
     // 不直接在用户策略中暴露，避免破坏确认逻辑。

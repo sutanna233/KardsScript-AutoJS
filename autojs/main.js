@@ -1,6 +1,7 @@
 var config = require("./lib/config");
 var vision = require("./lib/vision");
 var runtime = require("./lib/runtime");
+var humanize = require("./lib/humanize");
 
 auto.waitFor();
 // Auto.js opens the script runner in the foreground.  KARDS owns the
@@ -32,6 +33,7 @@ var bot = runtime.create(config);
 // Do not show a startup toast: Auto.js status/permission toasts cover the
 // bottom fan and make the first fee/hand observation unusable. The runtime
 // records its state in memory and the bounded tools write JSONL when needed.
+var hzTickEnabled = config.humanize && config.humanize.enabled;
 while (!bot.stopped()) {
     // captureScreen() owns and may reuse this buffer on the next capture. The
     // vision layer only reads it synchronously, so it must not recycle it.
@@ -39,5 +41,6 @@ while (!bot.stopped()) {
     var observation = analyzer.observe(frame);
     observation.frame = { width: observation.width, height: observation.height };
     bot.tick(observation);
-    sleep(config.tickMs);
+    // 拟人化：观察间隔加入 ±15% 随机扰动，避免完美等间距心跳
+    sleep(hzTickEnabled ? humanize.tickInterval(config.tickMs) : config.tickMs);
 }
