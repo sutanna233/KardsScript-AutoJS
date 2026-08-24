@@ -53,7 +53,7 @@
 
 ## 二、当前交付状态
 
-- **最新版本**：`CometAssistant-v1.1.3.apk`，已发布到 GitHub Release v1.1.3（Latest）。
+- **最新版本**：`CometAssistant-v1.1.4.apk`，已发布到 GitHub Release v1.1.4（Latest）。
 - 代码已推送 main，最新提交 `b33dacd`。
 - 离线测试 10 个全部通过。
 - 实机连打多局（16 分钟、多局）回合判定正常，无超时停机。
