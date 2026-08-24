@@ -142,6 +142,7 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - **已正确采集页面**：模式菜单 `MODE_MENU/mode-menu`（置信度 1.0）、训练模式选中后的卡组列表 `DECK_LIST/training-deck-chooser-selected`（0.92）、卡组详情 `DECK_DETAIL/deck-detail`（1.0）。
 - **换牌页回放误判**：真实截图含“选择要替换的卡牌”和底部“确认”的 MULLIGAN 页面，使用 1.1.4 vision 回放却返回 `BATTLE/grey-end-turn`（0.90）；换牌模板或右侧回合控件规则需要进一步校准。
 - 以上页面截图保存在项目工作区的 `page-*.png` 测试产物中；本轮未执行出牌、攻击或结束回合。
+- **设置页误判**：实机打开战斗齿轮后的“设置/投降”浮层仍返回 `BATTLE/OUR_TURN`；进入完整设置页后仍返回 `MODE_MENU/mode-menu`。`battle-settings-menu.png`、`settings-tab.png` 等按钮模板虽存在，但当前页面分类没有在 `observe()` 的早期路径使用它们。
 
 ## 重要文档索引
 
