@@ -143,6 +143,8 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - **换牌页回放误判**：真实截图含“选择要替换的卡牌”和底部“确认”的 MULLIGAN 页面，使用 1.1.4 vision 回放却返回 `BATTLE/grey-end-turn`（0.90）；换牌模板或右侧回合控件规则需要进一步校准。
 - 以上页面截图保存在项目工作区的 `page-*.png` 测试产物中；本轮未执行出牌、攻击或结束回合。
 - **设置页误判**：实机打开战斗齿轮后的“设置/投降”浮层仍返回 `BATTLE/OUR_TURN`；进入完整设置页后仍返回 `MODE_MENU/mode-menu`。`battle-settings-menu.png`、`settings-tab.png` 等按钮模板虽存在，但当前页面分类没有在 `observe()` 的早期路径使用它们。
+- **收藏/商店页面未命中**：实机打开卡牌列表的真实截图返回 `UNKNOWN/unmatched`，打开商店的真实截图也返回 `UNKNOWN/unmatched`；两页均有对应按钮模板和 `uiRules`，但当前 1280×720 实机颜色/区域特征未满足规则。
+- **训练结算链路**：训练局投降后实际经过“失败”→“继续”→战场通票奖励页→卡组详情；奖励页实时识别为 `RESULT/template-result-continue`，置信度 0.99。首次失败页本身仍可能被宽松规则误判，需独立结果模板或页面优先级继续校准。
 
 ## 重要文档索引
 
