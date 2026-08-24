@@ -135,6 +135,14 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - Android 9 的 `emulator-5556` 与 Android 14 新实例行为不同；日志、运行状态和策略文件应优先迁移到应用私有目录，或显式处理 Android 11+ 的共享存储授权/目录创建失败。
 - 已修复：`auto-main.js` 启动时对运行目录做可写性探测，公共目录不可用时回退到 `context.getFilesDir()` 私有目录；日志、悬浮状态和归档统一使用探测结果，归档目录按归档文件路径创建。
 
+### 2026-08-24 1.1.4 持续实机页面采集（emulator-5556，1280×720）
+
+- **促销广告误判**：真实截图 `跳岛战术礼包` 的关闭 X 包围盒约为 `[1092,122,1126,158]`，中心约 `(1109,140)`；当前 `regions.popupClosePromo` 从 x=1145 才开始，促销模板无法命中。该广告曾被实时探针误判为 `DAILY_QUEST`，另一次被误判为 `BATTLE/white-end-turn-ui`，不得在这类误判下执行导航点击。
+- **主页误判**：关闭广告后真实画面为 HOME，但实时探针返回 `SHOP/shop`，说明 HOME 与 SHOP 的宽松颜色规则仍有重叠。
+- **已正确采集页面**：模式菜单 `MODE_MENU/mode-menu`（置信度 1.0）、训练模式选中后的卡组列表 `DECK_LIST/training-deck-chooser-selected`（0.92）、卡组详情 `DECK_DETAIL/deck-detail`（1.0）。
+- **换牌页回放误判**：真实截图含“选择要替换的卡牌”和底部“确认”的 MULLIGAN 页面，使用 1.1.4 vision 回放却返回 `BATTLE/grey-end-turn`（0.90）；换牌模板或右侧回合控件规则需要进一步校准。
+- 以上页面截图保存在项目工作区的 `page-*.png` 测试产物中；本轮未执行出牌、攻击或结束回合。
+
 ## 重要文档索引
 
 - `README.md`：安装、权限、模拟器机型、风险声明和用户说明。
