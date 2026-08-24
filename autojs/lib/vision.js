@@ -662,9 +662,9 @@ function isDailyFirstWin(features) {
     // existing daily-quest and level-result overlays out of this path.
     return features.top.L <= 45 &&
         features.title.L >= 30 && features.title.E >= 0.10 &&
-        features.viewBattle.L >= 25 && features.viewBattle.L <= 50 && features.viewBattle.E >= 0.12 &&
-        features.coins.L >= 40 && features.coins.L <= 90 && features.coins.E >= 0.15 &&
-        features.reward.L >= 35 && features.reward.L <= 55 && features.reward.E >= 0.10;
+        features.viewBattle.L >= 25 && features.viewBattle.L <= 60 && features.viewBattle.E >= 0.12 &&
+        features.coins.L >= 40 && features.coins.L <= 90 && features.coins.E >= 0.12 &&
+        features.reward.L >= 35 && features.reward.L <= 55 && features.reward.E >= 0.07;
 }
 function detectDailyFirstWin(image, config) {
     var regions = config && config.regions || {};

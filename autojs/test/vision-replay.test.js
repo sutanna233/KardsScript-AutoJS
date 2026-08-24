@@ -198,9 +198,9 @@ assert.strictEqual(reconnect.scene.scene, "RECONNECTING");
 var daily = vision.create(config).observe(png.decodePng("fixtures/current-attack-final-check.png"));
 assert.strictEqual(daily.uiScreen.screen, "DAILY_QUEST", "daily quest modal must be classified before HOME navigation");
 assert.strictEqual(vision._private.isDailyFirstWin({
-    top: { L: 32, S: 125, E: 0.10 }, title: { L: 42, S: 142, E: 0.16 },
-    viewBattle: { L: 36, S: 60, E: 0.18 }, coins: { L: 64, S: 108, E: 0.24 },
-    reward: { L: 41, S: 109, E: 0.14 }
+    top: { L: 27, S: 109, E: 0.09 }, title: { L: 57, S: 122, E: 0.20 },
+    viewBattle: { L: 50, S: 45, E: 0.23 }, coins: { L: 53, S: 123, E: 0.14 },
+    reward: { L: 37, S: 103, E: 0.08 }
 }), true, "daily first-win reward signature must be recognized");
 assert.strictEqual(vision._private.isDailyFirstWin({
     top: { L: 21, S: 31, E: 0.04 }, title: { L: 24, S: 25, E: 0.03 },
