@@ -239,6 +239,12 @@ module.exports = {
         resultReward: [0.40, 0.62, 0.60, 0.75],
         resultViewBattle: [0.74, 0.04, 0.97, 0.16],
         resultContinue: [0.42, 0.86, 0.60, 0.99],
+        // 每日首胜奖励页：标题/查看战场按钮/金币堆/底部“轻触领取”。
+        // 这些区域只用于组合识别，不直接驱动点击。
+        dailyFirstWinTitle: [0.25, 0.00, 0.62, 0.10],
+        dailyFirstWinViewBattle: [0.72, 0.03, 1.00, 0.14],
+        dailyFirstWinCoins: [0.23, 0.25, 0.63, 0.70],
+        dailyFirstWinReward: [0.25, 0.84, 0.75, 0.99],
         // Current promotional modal close X measured with image-grid-locate:
         // pixel bbox [1158,101]-[1192,145] on the 1280x720 build.
         popupClosePromo: [0.895, 0.12, 0.95, 0.22],

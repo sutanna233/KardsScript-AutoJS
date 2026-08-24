@@ -654,6 +654,29 @@ function detectPromoPopup(image, config) {
     return findTemplateInRegion(image, templates.popupClosePromo,
         Math.max(0.90, config.templateThreshold || 0), regions.popupClosePromo);
 }
+function isDailyFirstWin(features) {
+    if (!features || !features.top || !features.title || !features.viewBattle || !features.coins || !features.reward) return false;
+    // The reward page dims the board but retains four stable elements:
+    // bright title, grey top-right “查看战场” button, gold coin animation,
+    // and the bottom “20 金币 / 轻触领取” hint. Requiring all four keeps the
+    // existing daily-quest and level-result overlays out of this path.
+    return features.top.L <= 45 &&
+        features.title.L >= 30 && features.title.E >= 0.10 &&
+        features.viewBattle.L >= 25 && features.viewBattle.L <= 50 && features.viewBattle.E >= 0.12 &&
+        features.coins.L >= 40 && features.coins.L <= 90 && features.coins.E >= 0.15 &&
+        features.reward.L >= 35 && features.reward.L <= 55 && features.reward.E >= 0.10;
+}
+function detectDailyFirstWin(image, config) {
+    var regions = config && config.regions || {};
+    var features = {
+        top: feature(image, regions.topUi || [0, 0, 1, 0.11]),
+        title: feature(image, regions.dailyFirstWinTitle || [0.25, 0, 0.62, 0.10]),
+        viewBattle: feature(image, regions.dailyFirstWinViewBattle || [0.72, 0.03, 1, 0.14]),
+        coins: feature(image, regions.dailyFirstWinCoins || [0.23, 0.25, 0.63, 0.70]),
+        reward: feature(image, regions.dailyFirstWinReward || [0.25, 0.84, 0.75, 0.99])
+    };
+    return isDailyFirstWin(features) ? { id: "daily-first-win", features: features } : null;
+}
 // 对战卡组详情页的排位/休闲选中状态。返回 "ranked" | "casual" | null。
 // 模板限定在各自实测按钮区域；两状态同时命中或都不命中时返回 null（不猜）。
 function detectDeckModeToggle(image, config) {
@@ -1696,6 +1719,17 @@ function create(config) {
                 state: { scene: "UNKNOWN", uiScreen: "POPUP", credits: null, hand: [], handConfidence: 0, units: [], pending: null },
                 legalTargets: [], evidence: { hand: "促销弹窗", credits: null, knownCardCosts: 0, legalTargetCount: 0, enemyGuardMarkerCount: 0 } };
         }
+        var dailyFirstWin = detectDailyFirstWin(image, config);
+        if (dailyFirstWin) {
+            previousTargets = null;
+            lastBattleObservation = null;
+            lastFingerprint = null;
+            return { uiScreen: { screen: "DAILY_FIRST_WIN", confidence: 0.99, ruleId: "daily-first-win", priority: 125 },
+                scene: { scene: "UNKNOWN", confidence: 0.99, ruleId: "daily-first-win" },
+                width: image.getWidth(), height: image.getHeight(),
+                state: { scene: "UNKNOWN", uiScreen: "DAILY_FIRST_WIN", credits: null, hand: [], handConfidence: 0, units: [], pending: null },
+                legalTargets: [], evidence: { hand: "每日首胜奖励页", credits: null, knownCardCosts: 0, legalTargetCount: 0, enemyGuardMarkerCount: 0 } };
+        }
         mark("popup");
         var uiScreen = classifyScreen(image, config);
         mark("classify");
@@ -1911,4 +1945,4 @@ function create(config) {
     return { observe: observe };
 }
 
-module.exports = { create: create, observe: function (image, config) { return create(config).observe(image); }, _private: { cardAt: cardAt, detectHand: detectHand, handBounds: handBounds, bottomHandCountBySpan: bottomHandCountBySpan, fanBadgePresenceScore: fanBadgePresenceScore, ocrNumber: ocrNumber, stableOcrNumber: stableOcrNumber, ocrCardCost: ocrCardCost, ocrCardCostCandidates: ocrCardCostCandidates, cardCostCandidateBounds: cardCostCandidateBounds, detectOrangeCostBadge: detectOrangeCostBadge, directCombatTargets: directCombatTargets, unitState: unitState, detectFrontlineControl: detectFrontlineControl, detectTurnTransitionBanner: detectTurnTransitionBanner, ocrHqHealth: ocrHqHealth, rgbAverage: rgbAverage, identifyCardNation: identifyCardNation, identifyCardType: identifyCardType, identifyCardRarity: identifyCardRarity, identifyCardFoil: identifyCardFoil, identifyCard: identifyCard, detectReadyState: detectReadyState, detectOrangeMoveCost: detectOrangeMoveCost, enrichHandWithFees: enrichHandWithFees, cardCostBounds: cardCostBounds, legalTargets: legalTargets, feature: feature, detectBattleTurn: detectBattleTurn, detectResultScreen: detectResultScreen, detectMulliganScreen: detectMulliganScreen, detectPromoPopup: detectPromoPopup, detectDeckModeToggle, detectVersusSelected, detectEnemyGuardMarkers: detectEnemyGuardMarkers, guardIconBounds: guardIconBounds, detectHqBounds: detectHqBounds, detectFormationHqBounds: detectFormationHqBounds, hqHeaderIdentityScore: hqHeaderIdentityScore, detectHqByHealth: detectHqByHealth, dynamicFormationUnitSlots: dynamicFormationUnitSlots, hasBlockingOverlay: hasBlockingOverlay } };
+module.exports = { create: create, observe: function (image, config) { return create(config).observe(image); }, _private: { cardAt: cardAt, detectHand: detectHand, handBounds: handBounds, bottomHandCountBySpan: bottomHandCountBySpan, fanBadgePresenceScore: fanBadgePresenceScore, ocrNumber: ocrNumber, stableOcrNumber: stableOcrNumber, ocrCardCost: ocrCardCost, ocrCardCostCandidates: ocrCardCostCandidates, cardCostCandidateBounds: cardCostCandidateBounds, detectOrangeCostBadge: detectOrangeCostBadge, directCombatTargets: directCombatTargets, unitState: unitState, detectFrontlineControl: detectFrontlineControl, detectTurnTransitionBanner: detectTurnTransitionBanner, ocrHqHealth: ocrHqHealth, rgbAverage: rgbAverage, identifyCardNation: identifyCardNation, identifyCardType: identifyCardType, identifyCardRarity: identifyCardRarity, identifyCardFoil: identifyCardFoil, identifyCard: identifyCard, detectReadyState: detectReadyState, detectOrangeMoveCost: detectOrangeMoveCost, enrichHandWithFees: enrichHandWithFees, cardCostBounds: cardCostBounds, legalTargets: legalTargets, feature: feature, detectBattleTurn: detectBattleTurn, detectResultScreen: detectResultScreen, detectMulliganScreen: detectMulliganScreen, detectPromoPopup: detectPromoPopup, isDailyFirstWin: isDailyFirstWin, detectDailyFirstWin: detectDailyFirstWin, detectDeckModeToggle, detectVersusSelected, detectEnemyGuardMarkers: detectEnemyGuardMarkers, guardIconBounds: guardIconBounds, detectHqBounds: detectHqBounds, detectFormationHqBounds: detectFormationHqBounds, hqHeaderIdentityScore: hqHeaderIdentityScore, detectHqByHealth: detectHqByHealth, dynamicFormationUnitSlots: dynamicFormationUnitSlots, hasBlockingOverlay: hasBlockingOverlay } };

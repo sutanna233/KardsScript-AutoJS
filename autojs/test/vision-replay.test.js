@@ -197,6 +197,16 @@ assert.strictEqual(reconnect.uiScreen.screen, "RECONNECT", "inactive-session mod
 assert.strictEqual(reconnect.scene.scene, "RECONNECTING");
 var daily = vision.create(config).observe(png.decodePng("fixtures/current-attack-final-check.png"));
 assert.strictEqual(daily.uiScreen.screen, "DAILY_QUEST", "daily quest modal must be classified before HOME navigation");
+assert.strictEqual(vision._private.isDailyFirstWin({
+    top: { L: 32, S: 125, E: 0.10 }, title: { L: 42, S: 142, E: 0.16 },
+    viewBattle: { L: 36, S: 60, E: 0.18 }, coins: { L: 64, S: 108, E: 0.24 },
+    reward: { L: 41, S: 109, E: 0.14 }
+}), true, "daily first-win reward signature must be recognized");
+assert.strictEqual(vision._private.isDailyFirstWin({
+    top: { L: 21, S: 31, E: 0.04 }, title: { L: 24, S: 25, E: 0.03 },
+    viewBattle: { L: 16, S: 34, E: 0 }, coins: { L: 127, S: 68, E: 0.38 },
+    reward: { L: 36, S: 66, E: 0.07 }
+}), false, "daily quest modal must not be mistaken for first-win reward");
 var currentRewardResult = vision.create(config).observe(png.decodePng("fixtures/unknown-after-unit-slot-fix-1787378716040.png"));
 assert.strictEqual(currentRewardResult.uiScreen.screen, "RESULT", "current level-reward overlay must be classified as RESULT");
 assert.strictEqual(currentRewardResult.uiScreen.ruleId, "template-result-continue", "reward overlay must map to the bottom Continue action");

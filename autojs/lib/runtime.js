@@ -523,7 +523,7 @@ module.exports.create = function (config) {
     }
     function tick(observation) {
         if (stopped) return;
-        var visualKardsScreen = observation && observation.uiScreen && ["HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN", "BATTLE", "RESULT", "RECONNECT", "DAILY_QUEST", "POPUP", "SHOP", "CARD_COLLECTION"].indexOf(observation.uiScreen.screen) >= 0;
+        var visualKardsScreen = observation && observation.uiScreen && ["HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN", "BATTLE", "RESULT", "RECONNECT", "DAILY_QUEST", "DAILY_FIRST_WIN", "POPUP", "SHOP", "CARD_COLLECTION"].indexOf(observation.uiScreen.screen) >= 0;
         // Auto.js' runner activity can remain the reported package while its
         // capture still shows the game. In automatic mode, trusting the
         // captured frame avoids pausing exactly during mulligan/result fades;
@@ -588,7 +588,7 @@ module.exports.create = function (config) {
         // an enemy target is already on screen.  The old early return here
         // silently skipped MOVE/ATTACK and made the bot end the turn instead.
         observation.state.handStable = handStable >= (config.minStableHandFrames || 2);
-        if (["HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN", "RESULT", "RECONNECT", "DAILY_QUEST", "POPUP", "SHOP", "CARD_COLLECTION"].indexOf(ui.screen) >= 0) {
+        if (["HOME", "MODE_MENU", "DECK_LIST", "DECK_DETAIL", "MULLIGAN", "RESULT", "RECONNECT", "DAILY_QUEST", "DAILY_FIRST_WIN", "POPUP", "SHOP", "CARD_COLLECTION"].indexOf(ui.screen) >= 0) {
             var advanced = driver.tapVerifiedUi(ui.screen, ui.confidence, observation.frame, ui.ruleId, observation.state);
             return advanced.ok ? (failures = 0, log(advanced.detail)) : fail(advanced);
         }

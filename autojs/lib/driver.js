@@ -155,6 +155,11 @@ function create(config) {
             if (dailyTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };
             return dailyTap;
         }
+        if (screen === "DAILY_FIRST_WIN") {
+            var rewardTap = tap(slots.DAILY_FIRST_WIN_CLAIM, frame, "已领取每日首胜20金币");
+            if (rewardTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };
+            return rewardTap;
+        }
         if (screen === "POPUP") {
             var popupTap = tap(slots.PROMO_POPUP_CLOSE, frame, "已关闭当前促销弹窗");
             if (popupTap.ok) navigationPending = { screen: screen, key: navigationKey, sentAt: Date.now() };

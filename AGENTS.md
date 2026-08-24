@@ -40,6 +40,21 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - `/sdcard/AutoJs6/KardsScript/auto-main-log.jsonl`
 - `/sdcard/AutoJs6/KardsScript/runs/games-*.jsonl`
 
+## 独立 APK 打包（已验证配方，2026-08-23 修正）
+
+完整流程：改代码 → `node autojs/tools/bundle-standalone-apk.js`（重生成 `apk-main.js`）→ 复制 `apk-main.js`+`project.json` 到 `vendor/AutoJs6/app/src/main/assets-inrt/project/` → Gradle `assembleInrtDebug` → 注入原生库 → zipalign → apksigner → 安装。
+
+关键坑（实机踩过）：
+
+- **inrt 的 Gradle 不会把 .so 打进 APK**（`packageInrtDebug` 报 "no .so files"），即使 `app/src/main/jniLibs/` 和 `merged_native_libs` 里都有。必须手动注入。
+- **正确注入源 = `apk-native-sources/`（16 个）+ OpenCV AAR（4 个）= 共 20 个 .so**，不是只注入 termexec AAR：
+  - `apk-native-sources/`：`libc++_shared` + `libjackpal-termexec2` + `libjackpal-androidterm5` + `libmediainfo`，×4 ABI
+  - `vendor/AutoJs6/libs/org-opencv-4_8_0/opencv-4.8.0.aar`：`libopencv_java4` ×4 ABI
+- **只注入 termexec AAR（8 个）会在战斗时报 `images.findImage` 失败 / `org.opencv.core.Mat.n_Mat() UnsatisfiedLinkError`**：`libopencv_java4.so` 依赖 `libc++_shared.so`，缺它则 OpenCV 加载失败、Java 层 `Mat.n_Mat()` 无实现。`libc++_shared.so` 必须注入。
+- 注入脚本支持混用 AAR 与单个 .so：`python tools/add-native-libs-to-apk.py <built.apk> <opencv.aar> <apk-native-sources/**.so...> <out.apk>`（.so 的 ABI 取自其父目录名）。
+- 构建产物：`vendor/AutoJs6/app/build/outputs/apk/inrt/debug/comet-v6.7.0-universal.apk`；zipalign/apksigner 用 `C:\Users\User\scoop\apps\android-clt\current\build-tools\36.0.0\`。
+- 生成物不入库：`apk-main.js`、APK、`vendor/`、`native-shell/`、`apk-native-sources/`、截图均不进公开 Git。
+
 ## 输入与安全红线
 
 - KARDS Unreal 引擎使用 `input touchscreen tap/swipe`；普通 `input tap` 不可靠，不作为主路径。
@@ -76,6 +91,21 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - **覆盖范围**：所有 tap（导航/单位/目标/结束回合/弹窗）走 `tap()` 自适应抖动；所有拖拽（出牌/攻击/移动）走 swipe 端点抖动 + 时长随机化。
 - **测试**：`autojs/test/humanize.test.js`（32 项，含三角分布中心密度验证）；`runtime-replay.test.js` 关闭拟人化以保持坐标断言确定性。
 
+## 出牌安全护栏（2026-08-24 新增）
+
+- **单卡出牌次数上限**：`config.maxCardPlayAttemptsPerCard`（默认 2，用户可在 `user-strategy.json` 编辑，范围 1~5）。同一张手牌被反复尝试出牌但**未真实打出**（下一帧该牌 id 仍在手牌中）时累计计数，达到上限即本回合封锁该牌，转向下一张或结束回合。
+- **目的**：硬性打断"手牌误判/幻影牌误判可出 → 费用不足反复拖牌 → 卡死"循环。不追求识别完美，用护栏兜底。
+- **实现**：`runtime.js` 的 `cardPlayAttempts`（按 card.id 计数）+ `lastAttemptedCardId`（判断牌是否真打出：出牌后下一帧该 id 消失才清零，仍在则保留计数）。回合转换时清空。
+- **注意**：出牌确认的"手牌减少一张"会被拖拽动画误判（detectHand 数量短暂抖动），`playAttempts` 会被反复重置，所以不能用 `playAttempts` 做卡死判定，必须用本机制按 card.id 追踪。
+
+## 性能基线（2026-08-24 实测，emulator-5556 1280×720）
+
+- 视觉观察帧：p50 从 2836ms → 1462ms（-48%），p90 从 10.8s → 1.7s（-84%）。
+- 瓶颈本质是 **Rhino 纯 JS 循环 + 每次 pixel() 的 JNI 调用**，不是单次 JNI（实测 2 万次 JNI 仅 337ms）。
+- 已做优化：像素采样加粗（frontline/banner/orangeMoveCost）、HQ 重扫限频 3s、hand/guard/指纹缓存、BFS 内联、稳态跳帧（stale 帧画面未变则跳过状态机）。
+- **像素采样陷阱**：`detectOrangeCostBadge` 的步长是精细校准的（改步长会把灰色费用误判为橙色），`feature()` 的边缘密度 E 对 stride 敏感——这两处的采样密度**不能动**（回归测试 vision-replay 会抓到）。
+- `captureScreen()` 本身约 880ms/帧（系统层，不可优化），不占 observeMs。
+
 ## 当前已知限制
 
 - 项目仍在开发中，存在未知 Bug；脚本可能卡住、停止运行或需要手动恢复，不保证稳定挂机。
@@ -83,6 +113,18 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - 单位可操作状态、自动攻击、结算后再匹配和全部异常恢复仍需更多独立实机证据。
 - 模板必须匹配当前 UI 版本；历史模板不得直接用于自动点击。
 - 分辨率不为 1280×720 时，不得假设现有坐标和模板仍安全。
+
+### 2026-08-24 实测发现的识别缺陷（未根治）
+
+- **手牌数量检测对 3 张及以下扇形误判**：实测 3 张手牌被 `bottomHandCountBySpan` 的 envelope 兜底公式 `(w-120)/120+1` 误判为 5 张（envelope 592px 落入未校准区间）。校准表只覆盖 4/5/6 张（620/680/720px），1–3 张小手牌无校准数据。误判出幻影牌后若其 costBounds 落在真实牌暖色卡面，会被 `detectOrangeCostBadge` 误判为橙色可出 → 费用 0 时反复出牌卡死（已由"单卡出牌上限"护栏兜底打断，未根治识别）。
+- **HQ 详情检视界面无自动关闭**：误触我方总部卡面会弹出 HQ 详情大卡（背景暗化 + 左上"总部"提示框），runner 无此页面识别与关闭逻辑，会卡住。需加识别规则 + 点卡片外部/返回键关闭。
+- **误入排位疑点**：用户报告 runner 误入排位（配置 modeType=training）。`coordinates.js` 的 `MODE_TRAINING` 中心 (357,259) 与历史记录 (226,175) 不一致，疑似坐标偏移导致误触对战模式。未定位确认。
+- **实机环境差异**：本轮实测用的是 `emulator-5556`（机型 2410DPN6CC / Android 9），非约定的雷电 5555 + Xiaomi 15 Pro。分辨率一致（1280×720）故坐标兼容，但机型差异未覆盖验证。
+
+### 2026-08-24 每日首胜奖励页
+
+- 用户实测每日首胜奖励页会显示“每日首胜”、20金币、“轻触领取”和右上“查看战场”；此前未建模为独立页面，runner 会落入 UNKNOWN 而卡住。
+- 已增加 `DAILY_FIRST_WIN` 组合识别（顶部暗化 + 标题 + 查看战场按钮 + 金币堆 + 底部奖励提示），领取动作固定点击底部奖励提示区域；不得点击右上“查看战场”。
 
 ## 重要文档索引
 

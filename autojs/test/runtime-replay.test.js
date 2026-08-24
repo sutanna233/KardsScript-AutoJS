@@ -42,6 +42,10 @@ presses.length = 0;
 menu.tick(observation("DAILY_QUEST", "UNKNOWN"));
 assert.strictEqual(presses.length, 1, "daily quest modal should be dismissed before navigation");
 presses.length = 0;
+menu.tick(observation("DAILY_FIRST_WIN", "UNKNOWN"));
+assert.strictEqual(presses.length, 1, "daily first-win reward should be claimed before navigation");
+assert.deepStrictEqual(presses[0], [640, 650], "daily first-win claim must use the bottom reward hint, not 查看战场");
+presses.length = 0;
 menu.tick(observation("POPUP", "UNKNOWN"));
 assert.strictEqual(presses.length, 1, "promotional popup should be closed before navigation");
 
