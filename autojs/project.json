@@ -1,9 +1,9 @@
-{
-  "name": "彗星助手",
+﻿{
+  "name": "褰楁槦鍔╂墜",
   "main": "apk-main.js",
   "ignore": ["captures/"],
   "icon": "assets/comet-assistant-icon.png",
   "packageName": "com.kardsscript.autojs",
-  "versionName": "1.0.1",
-  "versionCode": 4
+  "versionName": "1.1.2",
+  "versionCode": 15
 }

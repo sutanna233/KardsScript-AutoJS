@@ -12,7 +12,34 @@ function green(c) { return (c >>> 8) & 255; }
 function blue(c) { return c & 255; }
 function luma(c) { return red(c) * 0.2126 + green(c) * 0.7152 + blue(c) * 0.0722; }
 function saturation(c) { var high = Math.max(red(c), green(c), blue(c)); var low = Math.min(red(c), green(c), blue(c)); return high === 0 ? 0 : (high - low) / high * 255; }
-function pixel(image, x, y) { return image.pixel(clamp(x, 0, image.getWidth() - 1), clamp(y, 0, image.getHeight() - 1)); }
+function pixel(image, x, y) {
+    var w = image.getWidth(), h = image.getHeight();
+    x = clamp(x, 0, w - 1); y = clamp(y, 0, h - 1);
+    // 帧缓冲命中时走纯数组访问，零 JNI。
+    if (_framePixels && _framePixels.width === w && _framePixels.height === h) {
+        return Number(_framePixels.buf[y * w + x]) | 0;
+    }
+    return image.pixel(x, y);
+}
+
+// ─── 帧像素缓冲：消除 per-pixel JNI ─────────────────────────────────────────
+// ImageWrapper.pixel() 每次都跨 Java bridge（Bitmap.getPixel / Mat.get）。
+// 战斗帧的像素采样高达 3–8 万次/帧（HQ 扫描、frontline、hand 等），这是
+// vision-slow-frame 的主因。observe() 开头一次性把整帧拷贝成 Java int[]
+// （单次 JNI），之后所有采样变成纯数组访问。Node 离线环境无 java.* 时
+// 自动回退到逐像素 image.pixel()，行为完全不变。
+var _framePixels = null;
+function createPixelSource(image) {
+    if (typeof java === "undefined" || !java.lang || !java.lang.reflect) return null;
+    try {
+        var bmp = typeof image.getBitmap === "function" ? image.getBitmap() : null;
+        if (!bmp || typeof bmp.getPixels !== "function") return null;
+        var w = bmp.getWidth(), h = bmp.getHeight();
+        var arr = java.lang.reflect.Array.newInstance(java.lang.Integer.TYPE, w * h);
+        bmp.getPixels(arr, 0, w, 0, 0, w, h);
+        return { buf: arr, width: w, height: h };
+    } catch (e) { return null; }
+}
 
 function feature(image, bounds, stride) {
     var x0 = Math.max(0, Math.floor(bounds[0] * image.getWidth())), y0 = Math.max(0, Math.floor(bounds[1] * image.getHeight()));
@@ -82,6 +109,9 @@ function resolveTemplatePath(path) {
 // the script exits. Captured screen frames are still owned/recycled normally.
 var templateImageCache = {};
 var maskTemplateImageCache = {};
+// 密扇（6 vs 7–9 张）复核结论缓存：按 spanCount/contiguous 证据签名复用，
+// 手牌数不变时跳过每帧 4 次 fanBadgeScore（约 8400 次采样）。
+var _denseCacheKey = null, _denseCacheCount = null;
 function loadTemplate(path) {
     var resolved = resolveTemplatePath(path);
     if (typeof images === "undefined" || !resolved) return null;
@@ -261,7 +291,8 @@ function detectHqBounds(image, isEnemy, config) {
     // half-board instead.
     function borderContrast(b) {
         var w = image.getWidth(), h = image.getHeight(), x0 = Math.round(b[0] * w), x1 = Math.round(b[2] * w), y0p = Math.round(b[1] * h), y1p = Math.round(b[3] * h), sum = 0, n = 0;
-        for (var t = 0.08; t < 0.93; t += 0.14) {
+        // 性能：环 0.14→0.22 步长（7→4 环）。兜底路径，粗采样足够。
+        for (var t = 0.08; t < 0.93; t += 0.22) {
             var yy = Math.round(y0p + (y1p - y0p) * t), xx = Math.round(x0 + (x1 - x0) * t);
             sum += Math.abs(luma(pixel(image, x0 - 3, yy)) - luma(pixel(image, x0 + 3, yy))) / 255;
             sum += Math.abs(luma(pixel(image, x1 - 3, yy)) - luma(pixel(image, x1 + 3, yy))) / 255;
@@ -282,8 +313,8 @@ function detectHqBounds(image, isEnemy, config) {
         });
         return penalty;
     }
-    for (var y = y0; y <= y1 - 0.20; y += 0.04) for (var x = 0.18; x <= 0.82; x += 0.03) {
-        var b = [x, y, x + 0.085, y + 0.20], f = feature(image, b, 10), border = borderContrast(b);
+    for (var y = y0; y <= y1 - 0.20; y += 0.06) for (var x = 0.18; x <= 0.82; x += 0.045) {
+        var b = [x, y, x + 0.085, y + 0.20], f = feature(image, b, 16), border = borderContrast(b);
         // Do not assume the HQ is centred: some boards place it beside a
         // command unit. Only a very small penalty suppresses totally remote
         // bright art without pulling the box away from the detected card.
@@ -307,16 +338,20 @@ function detectHqBounds(image, isEnemy, config) {
 // unit cost/header.
 function detectFormationHqBounds(image, isEnemy) {
     if (!image) return null;
-    var yStarts = isEnemy ? [0.12, 0.13, 0.14, 0.15, 0.16] : [0.57, 0.58, 0.59, 0.60, 0.61, 0.62];
+    // 性能：yStarts 5–6 个 → 3 个（HQ 顶部 y 漂移很小，实测敌方 .12–.16 /
+    // 我方 .57–.62 的中间三点足够覆盖），重扫帧省约 45%。
+    var yStarts = isEnemy ? [0.12, 0.14, 0.16] : [0.58, 0.60, 0.62];
     var width = 0.085, height = 0.20, candidates = [];
     function borderScore(bounds) {
         var w = image.getWidth(), h = image.getHeight();
         var x0 = Math.round(bounds[0] * w), x1 = Math.round(bounds[2] * w);
         var y0 = Math.round(bounds[1] * h), y1 = Math.round(bounds[3] * h);
         var sum = 0, hits = 0, count = 0;
-        for (var i = 1; i <= 10; i++) {
-            var yy = Math.round(y0 + (y1 - y0) * i / 11);
-            var xx = Math.round(x0 + (x1 - x0) * i / 11);
+        // 性能：环数 10→6（每候选 80→48 次 pixel）。HQ 卡边框是对比强信号，
+        // 6 个采样环足以区分，阈值逻辑不变。
+        for (var i = 1; i <= 6; i++) {
+            var yy = Math.round(y0 + (y1 - y0) * i / 7);
+            var xx = Math.round(x0 + (x1 - x0) * i / 7);
             var deltas = [
                 Math.abs(luma(pixel(image, x0 - 3, yy)) - luma(pixel(image, x0 + 3, yy))),
                 Math.abs(luma(pixel(image, x1 - 3, yy)) - luma(pixel(image, x1 + 3, yy))),
@@ -328,7 +363,9 @@ function detectFormationHqBounds(image, isEnemy) {
         return hits / Math.max(1, count) * 4 + sum / Math.max(1, count) / 255;
     }
     yStarts.forEach(function (y) {
-        for (var x = 0.20; x <= 0.78; x += 0.01) {
+        // 性能：x 步长 0.01→0.02（59→30 列）。HQ 卡宽 0.085（~109px），
+        // 25.6px 步长的峰值定位误差远小于卡宽，不影响链式匹配。
+        for (var x = 0.20; x <= 0.78; x += 0.02) {
             var bounds = [x, y, x + width, y + height];
             candidates.push({ x: x, y: y, bounds: bounds, score: borderScore(bounds) });
         }
@@ -348,12 +385,17 @@ function detectFormationHqBounds(image, isEnemy) {
     });
     var best = null;
     if (chainMembers.length) {
-        chainMembers.forEach(function (candidate) {
+        // 性能：header feature 每次约千次采样，最多 24 个链成员全算是重扫帧
+        // 的主要开销之一。HQ 必然在 borderScore 最高的少数候选里，先截断
+        // 前 8 个再做精排，语义不变。
+        chainMembers.sort(function (a, b) { return b.score - a.score; });
+        var topMembers = chainMembers.slice(0, 8);
+        topMembers.forEach(function (candidate) {
             var header = feature(image, [candidate.x, candidate.y, candidate.x + width, Math.min(1, candidate.y + 0.06)], 3);
             candidate.hqVisualScore = candidate.score + (1 - header.S / 255) * 1.2 + header.E * 2.5;
         });
-        chainMembers.sort(function (a, b) { return b.hqVisualScore - a.hqVisualScore || b.score - a.score; });
-        best = chainMembers[0];
+        topMembers.sort(function (a, b) { return b.hqVisualScore - a.hqVisualScore || b.score - a.score; });
+        best = topMembers[0];
     } else if (peaks.length) {
         var expected = isEnemy ? 0.35 : 0.32;
         peaks.sort(function (a, b) {
@@ -379,10 +421,11 @@ function detectHqByHealth(image, isEnemy) {
     // the scan on the measured health band instead.
     var y0 = Math.round(h * (isEnemy ? 0.20 : 0.70));
     var y1 = Math.round(h * (isEnemy ? 0.35 : 0.83));
-    var redPixels = {}, keys = [], sampleStep = 2;
-    // Auto.js image.pixel() crosses the Java bridge. Sampling every second
-    // pixel preserves the large health glyph while reducing this first-frame
-    // sweep to one quarter of its former cost.
+    var redPixels = {}, keys = [], sampleStep = 3;
+    // Auto.js image.pixel() crosses the Java bridge. Sampling every third
+    // pixel preserves the large health glyph while reducing this sweep to
+    // one ninth of the densest pass. 面积阈值随采样密度按 (2/3)²≈0.44 缩放；
+    // height/width 是真实像素距离，仅随网格精度微降。
     for (var y = y0; y < y1; y += sampleStep) for (var x = x0; x < x1; x += sampleStep) {
         var color = pixel(image, x, y), r = red(color), g = green(color), b = blue(color);
         if (r > 105 && r > g * 1.35 && r > b * 1.25) {
@@ -396,8 +439,11 @@ function detectHqByHealth(image, isEnemy) {
         -sampleStep, sampleStep,
         w * sampleStep - sampleStep, w * sampleStep, w * sampleStep + sampleStep
     ];
-    keys.forEach(function (seed) {
-        if (!redPixels[seed]) return;
+    // 性能：Rhino 里 forEach 每次迭代是一次闭包调用（10–50μs），BFS 内层
+    // 每像素 8 次闭包在红牌多的帧上就是秒级。改为索引 for 循环内联。
+    for (var ki = 0; ki < keys.length; ki++) {
+        var seed = keys[ki];
+        if (!redPixels[seed]) continue;
         var stack = [seed], area = 0, minX = w, maxX = 0, minY = h, maxY = 0, sumX = 0, sumY = 0;
         delete redPixels[seed];
         while (stack.length) {
@@ -405,18 +451,18 @@ function detectHqByHealth(image, isEnemy) {
             area++; sumX += px; sumY += py;
             if (px < minX) minX = px; if (px > maxX) maxX = px;
             if (py < minY) minY = py; if (py > maxY) maxY = py;
-            offsets.forEach(function (offset) {
-                var next = key + offset;
+            for (var oi = 0; oi < 8; oi++) {
+                var next = key + offsets[oi];
                 if (redPixels[next]) { delete redPixels[next]; stack.push(next); }
-            });
+            }
         }
-        if (area >= 18) components.push({ area: area, width: maxX - minX + sampleStep, height: maxY - minY + sampleStep, cx: sumX / area, cy: sumY / area });
-    });
-    var glyphs = components.filter(function (part) { return part.area >= 31 && part.height >= 22 && part.width <= 30; });
+        if (area >= 8) components.push({ area: area, width: maxX - minX + sampleStep, height: maxY - minY + sampleStep, cx: sumX / area, cy: sumY / area });
+    }
+    var glyphs = components.filter(function (part) { return part.area >= 14 && part.height >= 20 && part.width <= 30; });
     if (!glyphs.length) return null;
     glyphs.sort(function (a, b) { return b.area - a.area; });
     var best = glyphs[0], neighbours = components.filter(function (part) {
-        return part.area >= 20 && part.height >= 18 && part.width <= 30 && Math.abs(part.cx - best.cx) <= 34 && Math.abs(part.cy - best.cy) <= 12;
+        return part.area >= 9 && part.height >= 16 && part.width <= 30 && Math.abs(part.cx - best.cx) <= 34 && Math.abs(part.cy - best.cy) <= 12;
     });
     var total = 0, sumX = 0, sumY = 0;
     neighbours.forEach(function (part) { total += part.area; sumX += part.cx * part.area; sumY += part.cy * part.area; });
@@ -453,15 +499,45 @@ function dynamicFormationUnitSlots(hqSlots) {
     return slots;
 }
 function activeSlots(config) { return config._activeTargetSlots || config.targetSlots || []; }
+// ─── 稳态跳帧：战斗画面指纹 ────────────────────────────────────────────────
+// 14 个采样点覆盖全部决策依赖区域（结束回合按钮、双方 HQ、手牌扇、双方
+// 战场、中央分界线）。每点 3×3 均值 + >>5 量化，吸收卡面呼吸光效的微噪声；
+// 任何出牌/移动/攻击/血量变化都会改变至少一个点。
+function battleFingerprint(image) {
+    var w = image.getWidth(), h = image.getHeight();
+    var pts = [
+        [0.905, 0.72], [0.45, 0.10], [0.45, 0.90],
+        [0.25, 0.93], [0.45, 0.93], [0.65, 0.93],
+        [0.30, 0.57], [0.50, 0.57], [0.70, 0.57],
+        [0.30, 0.25], [0.50, 0.25], [0.70, 0.25],
+        [0.50, 0.50], [0.90, 0.45]
+    ];
+    var fp = [];
+    for (var i = 0; i < pts.length; i++) {
+        var cx = Math.round(pts[i][0] * w), cy = Math.round(pts[i][1] * h), sum = 0, n = 0;
+        for (var dy = -3; dy <= 3; dy += 3) for (var dx = -3; dx <= 3; dx += 3) {
+            sum += pixel(image, cx + dx, cy + dy); n++;
+        }
+        fp.push(Math.round(sum / n) >> 5);
+    }
+    return fp;
+}
+function fingerprintEqual(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+}
 function detectFrontlineControl(image) {
     if (!image) return { owner: "UNKNOWN", y: null, confidence: 0 };
     var width = image.getWidth(), height = image.getHeight(), best = null;
     // The jagged shared-frontline divider spans most of the board. Card
     // borders are local; score the fraction of the full horizontal strip
     // whose vertical contrast changes together.
-    for (var y = Math.round(height * 0.28); y <= Math.round(height * 0.64); y += 2) {
+    // 性能：y 步长 2→6、x 步长 8→24（约 2.6 万次 → 约 2.8 千次 pixel/帧）。
+    // 前线锯齿横贯全屏，粗采样不影响横带判定（阈值逻辑不变）。
+    for (var y = Math.round(height * 0.28); y <= Math.round(height * 0.64); y += 6) {
         var hits = 0, sum = 0, count = 0;
-        for (var x = Math.round(width * 0.20); x < Math.round(width * 0.82); x += 8) {
+        for (var x = Math.round(width * 0.20); x < Math.round(width * 0.82); x += 24) {
             var delta = Math.abs(luma(pixel(image, x, y - 4)) - luma(pixel(image, x, y + 4)));
             sum += delta;
             if (delta >= 18) hits++;
@@ -489,7 +565,9 @@ function detectTurnTransitionBanner(image) {
     // frontline card and can turn an enemy-controlled line into a false
     // neutral reading. Normal unit/card orange occupies far less of this
     // wide centre region.
-    for (var y = y0; y < y1; y += 3) for (var x = x0; x < x1; x += 3) {
+    // 性能：步长 3→6（约 7.2 千次 → 约 1.8 千次 pixel/帧）。
+    // 横幅是大面积橙色色块，6px 步长足够，判定阈值不变。
+    for (var y = y0; y < y1; y += 6) for (var x = x0; x < x1; x += 6) {
         var c = pixel(image, x, y), r = red(c), g = green(c), b = blue(c);
         total++;
         if (r >= 150 && r - g >= 35 && g - b >= 15) orange++;
@@ -618,7 +696,9 @@ function classifyScene(image, screen, config, detectedTurn) {
 var leftmostX = { 1: 640, 2: 587, 3: 535, 4: 482, 5: 430, 6: 377, 7: 325, 8: 272, 9: 220 };
 function cardAt(image, x1280, y720) {
     var cx = x1280 * image.getWidth() / 1280, cy = y720 * image.getHeight() / 720, lum = 0, warmth = 0, count = 0;
-    for (var dy = -15; dy <= 15; dy += 5) for (var dx = -15; dx <= 15; dx += 5) {
+    // 性能：采样窗 ±15 步长 5（49 点）→ ±10 步长 5（25 点）。阈值是均值
+    // 判定（lum>60 / warmth>10），均匀抽稀不改变均值语义。
+    for (var dy = -10; dy <= 10; dy += 5) for (var dx = -10; dx <= 10; dx += 5) {
         var color = pixel(image, Math.round(cx + dx), Math.round(cy + dy));
         lum += luma(color); warmth += red(color) - blue(color); count++;
     }
@@ -695,12 +775,16 @@ function bottomHandCountBySpan(image, layout) {
     // 145px constant systematically under-counted the six-card hand.
     var y = Math.min(image.getHeight() - 1, Math.round(680 * image.getHeight() / 720));
     var runs = [], runStart = -1, runEnd = -1;
-    for (var x1280 = 180; x1280 <= 1100; x1280 += 10) {
+    // 性能：步长 10→16（92→58 个探测点，每点 25 次采样）。envelope 宽度
+    // 判定阈值为百像素级，16px 探测步长足够。
+    for (var x1280 = 180; x1280 <= 1100; x1280 += 16) {
         var hit = cardAt(image, x1280, 680);
         if (hit) {
             if (runStart < 0) runStart = x1280;
             runEnd = x1280;
-        } else if (runStart >= 0 && x1280 - runEnd > 20) {
+        } else if (runStart >= 0 && x1280 - runEnd > 34) {
+            // 断 run 阈值随步长调整：步长 16 时 34 等价于原步长 10 时 20
+            // （连续三个未命中才断，保持原判定语义）。
             runs.push([runStart, runEnd]);
             runStart = -1; runEnd = -1;
         }
@@ -1075,21 +1159,37 @@ function detectHand(image) {
             // calibrated six-card replay. Use the independently measured fee
             // badge pattern only when it is decisively stronger; otherwise
             // retain the replay-calibrated count and do not guess.
-            var denseScore = fanBadgeScore(image, 8, layout);
-            var sevenScore = fanBadgeScore(image, 7, layout);
-            var nineScore = fanBadgeScore(image, 9, layout);
-            var sixScore = fanBadgeScore(image, 6, layout);
-            // A nine-card fan is visually distinguishable when several
-            // affordable-cost digits line up on its measured 81px arc. On
-            // the real nine-card fixture seven badges vote orange, while the
-            // wrong six/eight hypotheses see at most two. Require both an
-            // absolute vote and a clear margin so brown artwork cannot grow a
-            // six-card hand into nine.
-            var maxOtherDenseScore = Math.max(sixScore, sevenScore, denseScore);
-            if (nineScore >= 0.30 && nineScore > maxOtherDenseScore * 1.25) chosenCount = 9;
-            if (chosenCount === 6 && sevenScore >= 0.20 && sevenScore > fanBadgeScore(image, 6, layout) * 1.15) chosenCount = 7;
-            if ((chosenCount === 6 || chosenCount === 7) && denseScore >= 0.25 &&
-                denseScore > fanBadgeScore(image, chosenCount, layout) * 1.15) chosenCount = 8;
+            // 性能：4 次扇形徽章扫描（约 8400 次采样）仅在 chosenCount===6
+            // 时执行——envelope 宽度只对 6 张与 7–9 张密扇存在歧义，4/5 张
+            // 由 span 直接确定，1–2 张由连续探针确定，都不需要徽章复核。
+            // 进一步：密扇复核结论按探测证据（spanCount/contiguous）缓存，
+            // 手牌数不变的连续帧直接复用结论；出牌/抽牌后证据必变，自动
+            // 重新复核。
+            if (chosenCount === 6) {
+                var denseEvidenceKey = spanCount + "/" + contiguous;
+                if (_denseCacheKey === denseEvidenceKey && _denseCacheCount != null) {
+                    chosenCount = _denseCacheCount;
+                } else {
+                    var denseScore = fanBadgeScore(image, 8, layout);
+                    var sevenScore = fanBadgeScore(image, 7, layout);
+                    var nineScore = fanBadgeScore(image, 9, layout);
+                    var sixScore = fanBadgeScore(image, 6, layout);
+                    var byCount = { 6: sixScore, 7: sevenScore, 8: denseScore, 9: nineScore };
+                    // A nine-card fan is visually distinguishable when several
+                    // affordable-cost digits line up on its measured 81px arc. On
+                    // the real nine-card fixture seven badges vote orange, while the
+                    // wrong six/eight hypotheses see at most two. Require both an
+                    // absolute vote and a clear margin so brown artwork cannot grow a
+                    // six-card hand into nine.
+                    var maxOtherDenseScore = Math.max(sixScore, sevenScore, denseScore);
+                    if (nineScore >= 0.30 && nineScore > maxOtherDenseScore * 1.25) chosenCount = 9;
+                    if (chosenCount === 6 && sevenScore >= 0.20 && sevenScore > sixScore * 1.15) chosenCount = 7;
+                    if ((chosenCount === 6 || chosenCount === 7) && denseScore >= 0.25 &&
+                        denseScore > byCount[chosenCount] * 1.15) chosenCount = 8;
+                    _denseCacheKey = denseEvidenceKey;
+                    _denseCacheCount = chosenCount;
+                }
+            }
             matches = chosenCount ? [chosenCount] : [];
         }
         if (matches.length === 1) {
@@ -1148,7 +1248,9 @@ function detectOrangeMoveCost(image, slotBounds) {
     var px1 = Math.floor(x1 * image.getWidth()), py1 = Math.floor(y1 * image.getHeight());
     var px2 = Math.floor(x2 * image.getWidth()), py2 = Math.floor(y2 * image.getHeight());
     var orange = 0, total = 0;
-    for (var y = py1; y < py2; y += 2) for (var x = px1; x < px2; x += 2) {
+    // 性能：步长 2→3（每槽位约 170 → 约 76 次 pixel）。阈值 2% 对实测
+    // 5.5%/0% 的裕度充足，均匀抽稀不改变比例语义。
+    for (var y = py1; y < py2; y += 3) for (var x = px1; x < px2; x += 3) {
         var c = pixel(image, x, y), r = red(c), g = green(c), b = blue(c);
         total++;
         // Only the saturated orange numeral counts. The previous broad rule
@@ -1554,9 +1656,31 @@ function identifyCard(image, cardBounds, config) {
     };
 }
 function create(config) {
-    var previousTargets = null, feeFrame = 0, feeHandKey = "", cachedFees = null, typeCache = {}, cachedBattleHqSlots = null, battleLatched = false, lastBattleScene = null;
+    var previousTargets = null, feeFrame = 0, feeHandKey = "", cachedFees = null, typeCache = {}, cachedBattleHqSlots = null, battleLatched = false, lastBattleScene = null, guardCache = null, guardFrame = 0, cachedBattleHand = null, lastFingerprint = null, lastBattleObservation = null, lastHqScanAt = 0;
     config._activeTargetSlots = (config.targetSlots || []).slice();
     function observe(image) {
+        // 一次性装载整帧像素缓冲（单次 JNI），本帧所有 pixel() 采样走数组。
+        _framePixels = createPixelSource(image);
+        // 分段性能埋点：Date.now() 开销可忽略，perf 挂到返回对象，
+        // 由 auto-main 在慢帧时写入日志，用于定位真实耗时阶段。
+        var _perf = {}, _t0 = Date.now();
+        function mark(name) { var now = Date.now(); _perf[name] = (_perf[name] || 0) + (now - _t0); _t0 = now; }
+        // ─── 稳态跳帧（画面指纹）───────────────────────────────────────────
+        // 战斗中大部分帧内容不变，但全量分析要 ~1.6s。上帧是 BATTLE 且当前
+        // 帧关键点指纹与上帧一致时，直接复用上帧结果并标记 stale=true；
+        // runtime 对 stale 帧完全不推进状态机（不计 sameScene、不走动作
+        // 握手），等画面真正变化的帧再做全量分析。
+        if (lastBattleObservation) {
+            var fp = battleFingerprint(image);
+            if (lastFingerprint && fingerprintEqual(fp, lastFingerprint)) {
+                mark("fingerprint");
+                lastBattleObservation.stale = true;
+                lastBattleObservation.perf = _perf;
+                return lastBattleObservation;
+            }
+            lastFingerprint = fp;
+            mark("fingerprint");
+        }
         if (hasBlockingOverlay(image, config)) {
             previousTargets = null;
             return { uiScreen: { screen: "UNKNOWN", confidence: 0, ruleId: "blocking-overlay", priority: 1000 }, scene: { scene: "UNKNOWN", confidence: 0, ruleId: "blocking-overlay" }, width: image.getWidth(), height: image.getHeight(), state: { scene: "UNKNOWN", uiScreen: "UNKNOWN", credits: null, hand: [], handConfidence: 0, units: [], pending: null }, legalTargets: [], evidence: { hand: "阻塞性浮层，等待消失", credits: null, knownCardCosts: 0, legalTargetCount: 0, enemyGuardMarkerCount: 0 } };
@@ -1572,7 +1696,9 @@ function create(config) {
                 state: { scene: "UNKNOWN", uiScreen: "POPUP", credits: null, hand: [], handConfidence: 0, units: [], pending: null },
                 legalTargets: [], evidence: { hand: "促销弹窗", credits: null, knownCardCosts: 0, legalTargetCount: 0, enemyGuardMarkerCount: 0 } };
         }
+        mark("popup");
         var uiScreen = classifyScreen(image, config);
+        mark("classify");
         // Template matching is intentionally secondary to page classification.
         // The End Turn artwork can occur in shop/promotional cards at a high
         // pixel similarity; accepting it globally turns a shop frame into a
@@ -1593,10 +1719,12 @@ function create(config) {
         // frames where they provide real disambiguation.
         var detectedMulligan = (battleLatched || uiScreen.screen === "BATTLE") ? null : detectMulliganScreen(image, config);
         var detectedTurn = (uiScreen.screen === "BATTLE" || uiScreen.screen === "MULLIGAN") && !detectedMulligan ? detectBattleTurn(image, config) : null;
+        mark("turn");
         // An active End Turn control proves this is not a result page. Result
         // matching is relatively expensive in Auto.js (four constrained
         // templates), so only run it when no current-turn control exists.
         var detectedResult = detectedTurn ? null : detectResultScreen(image, config);
+        mark("result");
         // Promote the page-specific mulligan header even while the broad
         // anchor classifier is still in a fade/UNKNOWN state. This is the
         // critical fast path: waiting for a second full page classification
@@ -1610,18 +1738,28 @@ function create(config) {
         else if (detectedTurn) uiScreen = { screen: "BATTLE", confidence: detectedTurn.confidence, ruleId: detectedTurn.ruleId, priority: 100 };
         if (detectedResult) uiScreen = { screen: "RESULT", confidence: 0.99, ruleId: detectedResult.id === "continue" ? "template-result-continue" : "template-result-next-reward", priority: 100 };
         var scene = classifyScene(image, uiScreen, config, detectedTurn);
+        mark("scene");
         if (uiScreen.screen === "BATTLE" && detectTurnTransitionBanner(image)) {
             scene = { scene: "UNKNOWN", confidence: 0.99, ruleId: "turn-transition-banner" };
         }
+        mark("banner");
         if (uiScreen.screen === "BATTLE") {
             battleLatched = true;
-            // The HQ is not fixed. Refresh it at every transition into our
-            // turn and immediately after a board-changing action requested by
-            // runtime. Between those events retain the cache to keep the hot
-            // screenshot loop responsive.
-            if (config._invalidateBattleHq === true || (scene.scene === "OUR_TURN" && lastBattleScene !== "OUR_TURN")) {
-                cachedBattleHqSlots = null;
+            // The HQ is not fixed within one match, but its position does not
+            // change between turns on the same board. The exhaustive adaptive
+            // scan costs ~1.6s/frame on the emulator; refresh ONLY when the
+            // runtime marks the board changed (deploy/move), not on every
+            // opponent→our-turn transition. 跨局由 else 分支清空缓存兜底。
+            if (config._invalidateBattleHq === true) {
                 config._invalidateBattleHq = false;
+                // 性能：一回合内连续出牌/移动会连续置位 invalidate，而 HQ 在
+                // 一局内最多移位一次。距上次重扫不足 3 秒时沿用旧槽位（确认
+                // 失败路径会自行重试，不会卡死），把一回合多次动作的重扫从
+                // N 次降为 1 次。
+                if (!lastHqScanAt || Date.now() - lastHqScanAt > 3000) {
+                    cachedBattleHqSlots = null;
+                    lastHqScanAt = Date.now();
+                }
             }
             // HQ positions vary between board layouts, but remain fixed during
             // one match. The exhaustive adaptive scan costs several seconds
@@ -1659,10 +1797,15 @@ function create(config) {
                 battleLatched = false;
                 cachedBattleHqSlots = null;
                 typeCache = {};
+                guardCache = null;
+                cachedBattleHand = null;
+                lastHqScanAt = 0;
             }
             lastBattleScene = null;
         }
+        mark("hq");
         var frontline = uiScreen.screen === "BATTLE" ? detectFrontlineControl(image) : { owner: "UNKNOWN", y: null, confidence: 0 };
+        mark("frontline");
         // Never spend the player's timed action window calibrating new unit
         // icons. Unknown units already have the requested infantry fallback;
         // gradually fill the concrete type cache during opponent turns.
@@ -1675,11 +1818,34 @@ function create(config) {
             readyOnly: scene.scene === "OUR_TURN"
         };
         var frameUnits = uiScreen.screen === "BATTLE" ? unitState(image, config, typeCache, frontline.owner, typeBudget) : [];
-        var guardMarkers = uiScreen.screen === "BATTLE" ? detectEnemyGuardMarkers(image, config, frameUnits) : [];
+        mark("units");
+        // 性能：guard 是卡牌固有属性，一个回合内不变。每 4 帧才做一次
+        // 模板匹配（OpenCV 原生调用有固定 JNI/Mat 开销），中间帧复用结果。
+        // 离开 BATTLE 时随 typeCache 一起清空，避免跨局残留。
+        var guardMarkers = [];
+        if (uiScreen.screen === "BATTLE") {
+            guardFrame++;
+            if (!guardCache || guardFrame % 4 === 0) guardCache = detectEnemyGuardMarkers(image, config, frameUnits);
+            guardMarkers = guardCache;
+        }
+        mark("guard");
         var targetValues = null;
         var targets = uiScreen.screen === "BATTLE" ? directCombatTargets(config, frameUnits, guardMarkers) : [];
         previousTargets = null;
-        var hand = uiScreen.screen === "BATTLE" ? detectHand(image) : { cards: [], confidence: 0, detail: "非战场页面" };
+        // 性能：OPPONENT_TURN 期间我方手牌不会变化（回合开始抽牌发生在
+        // OUR_TURN 第一帧，那时 scene 已切换、缓存不被使用）。对方回合
+        // 复用缓存手牌，跳过每帧 ~600ms 的扇形探测；进入 OUR_TURN 或缓存
+        // 为空时立即真实检测。
+        var hand;
+        if (uiScreen.screen !== "BATTLE") {
+            hand = { cards: [], confidence: 0, detail: "非战场页面" };
+        } else if (scene.scene === "OUR_TURN" || !cachedBattleHand) {
+            hand = detectHand(image);
+            cachedBattleHand = hand;
+        } else {
+            hand = cachedBattleHand;
+        }
+        mark("hand");
         var fees = { credits: null, knownCards: 0 };
         if (scene.scene === "OUR_TURN" && config.fastPending !== true) {
             // Auto.js OCR is comparatively expensive. Calling it for all five
@@ -1730,7 +1896,17 @@ function create(config) {
         }
         var deckModeToggle = uiScreen.screen === "DECK_DETAIL" ? detectDeckModeToggle(image, config) : null;
         var versusSelected = uiScreen.screen === "MODE_MENU" ? detectVersusSelected(image, config) : false;
-        return { uiScreen: uiScreen, scene: scene, width: image.getWidth(), height: image.getHeight(), state: { scene: scene.scene, uiScreen: uiScreen.screen, credits: fees.credits, hand: hand.cards, handConfidence: hand.confidence, units: frameUnits, frontlineOwner: frontline.owner, frontlineY: frontline.y, frameHeight: image.getHeight(), deckModeToggle: deckModeToggle, versusSelected: versusSelected, pending: null }, legalTargets: targets, evidence: { hand: hand.detail, credits: fees.credits, knownCardCosts: fees.knownCards, legalTargetCount: targets.length, enemyGuardMarkerCount: guardMarkers.length, frontlineOwner: frontline.owner, frontlineY: frontline.y, frontlineConfidence: frontline.confidence, deckModeToggle: deckModeToggle, versusSelected: versusSelected } };
+        mark("fees");
+        var result = { uiScreen: uiScreen, scene: scene, width: image.getWidth(), height: image.getHeight(), perf: _perf, stale: false, state: { scene: scene.scene, uiScreen: uiScreen.screen, credits: fees.credits, hand: hand.cards, handConfidence: hand.confidence, units: frameUnits, frontlineOwner: frontline.owner, frontlineY: frontline.y, frameHeight: image.getHeight(), deckModeToggle: deckModeToggle, versusSelected: versusSelected, pending: null }, legalTargets: targets, evidence: { hand: hand.detail, credits: fees.credits, knownCardCosts: fees.knownCards, legalTargetCount: targets.length, enemyGuardMarkerCount: guardMarkers.length, frontlineOwner: frontline.owner, frontlineY: frontline.y, frontlineConfidence: frontline.confidence, deckModeToggle: deckModeToggle, versusSelected: versusSelected } };
+        // 稳态跳帧缓存：只有 BATTLE 帧参与指纹复用；其他可识别页面清空，
+        // UNKNOWN 转场帧保留缓存（回 BATTLE 后指纹大概率已变，会走全量）。
+        if (uiScreen.screen === "BATTLE") {
+            lastBattleObservation = result;
+        } else if (uiScreen.screen !== "UNKNOWN") {
+            lastBattleObservation = null;
+            lastFingerprint = null;
+        }
+        return result;
     }
     return { observe: observe };
 }

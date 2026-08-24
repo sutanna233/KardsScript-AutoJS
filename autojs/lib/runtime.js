@@ -523,6 +523,11 @@ module.exports.create = function (config) {
         } else {
             opponentTurnSince = 0;
         }
+        // 稳态跳帧：vision 标记 stale=true 的帧与上一帧画面完全一致。此处
+        // 之前已完成对手回合超时检查（wall-clock），此处之后的状态机推进
+        // （pending 握手、回合转换清理、动作执行）全部跳过；画面一旦变化，
+        // 下一帧即恢复全量分析与确认。
+        if (observation.stale === true) return;
         // Preserve pending actions and the same-turn deployment cooldown
         // across transient fade/overlay frames. Only a positively identified
         // non-player scene is a real turn transition; treating UNKNOWN as a
