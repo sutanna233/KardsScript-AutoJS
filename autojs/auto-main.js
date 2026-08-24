@@ -25,12 +25,46 @@ config.trustVisualForeground = true;
 config.userStrategyPath = "/sdcard/KardsScript/user-strategy.json";
 var loadedUserStrategy = userStrategy.read(config.userStrategyPath);
 var activeUserStrategy = userStrategy.apply(config, loadedUserStrategy.preferences);
-var out = "/sdcard/AutoJs6/KardsScript/auto-main-log.jsonl";
-var overlayStatus = "/sdcard/AutoJs6/KardsScript/floating-controller-status.jsonl";
+function runtimeStorageCandidates() {
+    var result = [], seen = {};
+    function add(path) { if (path && !seen[path]) { seen[path] = true; result.push(path); } }
+    var publicRoot = "/sdcard/AutoJs6/KardsScript";
+    // Keep the historical public path when it already exists and is writable.
+    // Android 14 may reject creating this non-default top-level directory.
+    try { if (typeof files !== "undefined" && files.exists(publicRoot)) add(publicRoot); } catch (_) {}
+    // App-private storage is available without shared-storage permission.
+    try {
+        if (typeof context !== "undefined" && context.getFilesDir) {
+            add(String(context.getFilesDir().getAbsolutePath()) + "/KardsScript");
+        }
+    } catch (_) {}
+    try {
+        if (typeof files !== "undefined" && files.cwd) add(files.join(files.cwd(), "runtime-data"));
+    } catch (_) {}
+    add(publicRoot);
+    return result;
+}
+function prepareRuntimeStorage() {
+    var candidates = runtimeStorageCandidates(), failures = [];
+    for (var i = 0; i < candidates.length; i++) {
+        var root = candidates[i], probe = root + "/.runtime-storage-probe";
+        try {
+            // ensureDir creates the parent directory of the supplied path.
+            files.ensureDir(probe);
+            files.write(probe, "ok");
+            try { files.remove(probe); } catch (_) {}
+            return root;
+        } catch (e) { failures.push(root + ": " + e); }
+    }
+    throw new Error("运行日志目录不可写：" + failures.join(" | "));
+}
+var runtimeRoot = prepareRuntimeStorage();
+var out = runtimeRoot + "/auto-main-log.jsonl";
+var overlayStatus = runtimeRoot + "/floating-controller-status.jsonl";
 var runId = String(Date.now());
-var archiveDir = "/sdcard/AutoJs6/KardsScript/runs";
+var archiveDir = runtimeRoot + "/runs";
 var archive = archiveDir + "/games-" + runId + ".jsonl";
-try { files.ensureDir(archiveDir); } catch (e0) {}
+try { files.ensureDir(archive); } catch (e0) {}
 files.write(out, "");
 try { files.write(overlayStatus, ""); } catch (eOverlayLog) {}
 function record(item) { files.append(out, JSON.stringify(item) + "\n"); }
@@ -60,7 +94,7 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
-try { files.write("/sdcard/AutoJs6/KardsScript/floating-control-state.txt", "running"); } catch (_) {}
+try { files.write(runtimeRoot + "/floating-control-state.txt", "running"); } catch (_) {}
 // 悬浮窗目前先禁用，避免 Auto.js6 rawWindow 在 inrt 中出现子控件裁剪。
 // 保留 __cometPaused 状态，后续改为可靠的原生悬浮服务。
 global.__cometPaused = false;
@@ -113,7 +147,7 @@ while (completedGames < targetGames) {
         if (Date.now() - lastOverlayStateAt > 500) {
             lastOverlayStateAt = Date.now();
             try {
-                var overlayState = files.read("/sdcard/AutoJs6/KardsScript/floating-control-state.txt");
+                var overlayState = files.read(runtimeRoot + "/floating-control-state.txt");
                 if (String(overlayState).trim() === "paused") { sleep(500); continue; }
                 if (String(overlayState).trim() === "stopped") { record({ t: Date.now() - started, event: "overlay-stop-requested" }); break; }
             } catch (_) {}

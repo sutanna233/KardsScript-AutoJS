@@ -133,6 +133,7 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - 同时系统日志明确记录 `MediaProvider: Creating or writing to a non-default top level directory is not allowed!`；`/sdcard/AutoJs6` 在新实例中不存在。
 - 根因不是 KARDS 识别或 OpenCV，而是 Android 14 共享存储限制：`auto-main.js` 第 33 行吞掉 `files.ensureDir(archiveDir)` 的失败，第 34 行又未捕获地写入公共目录，最终显示 `Wrapped org.autojs.autojs.pio.UncheckedIOException`。
 - Android 9 的 `emulator-5556` 与 Android 14 新实例行为不同；日志、运行状态和策略文件应优先迁移到应用私有目录，或显式处理 Android 11+ 的共享存储授权/目录创建失败。
+- 已修复：`auto-main.js` 启动时对运行目录做可写性探测，公共目录不可用时回退到 `context.getFilesDir()` 私有目录；日志、悬浮状态和归档统一使用探测结果，归档目录按归档文件路径创建。
 
 ## 重要文档索引
 
