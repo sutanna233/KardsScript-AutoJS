@@ -144,6 +144,8 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - 以上页面截图保存在项目工作区的 `page-*.png` 测试产物中；本轮未执行出牌、攻击或结束回合。
 - **设置页误判**：实机打开战斗齿轮后的“设置/投降”浮层仍返回 `BATTLE/OUR_TURN`；进入完整设置页后仍返回 `MODE_MENU/mode-menu`。`battle-settings-menu.png`、`settings-tab.png` 等按钮模板虽存在，但当前页面分类没有在 `observe()` 的早期路径使用它们。
 - **收藏/商店页面未命中**：实机打开卡牌列表的真实截图返回 `UNKNOWN/unmatched`，打开商店的真实截图也返回 `UNKNOWN/unmatched`；两页均有对应按钮模板和 `uiRules`，但当前 1280×720 实机颜色/区域特征未满足规则。
+- **每日任务页已验证**：从主页打开的真实“每日任务”页包含三张任务卡、重置倒计时和战场通票状态，实时探针稳定返回 `DAILY_QUEST/daily-quest`（置信度 1.0）；该弹窗没有 X，点击右下空白区域可关闭。关闭后若促销广告自动出现，仍可能被误判为 `DAILY_QUEST`。
+- **收藏筛选页未命中**：在卡牌页切换到“收藏”后进入带类型/花费筛选器和“完成”按钮的卡牌筛选页，真实截图仍返回 `UNKNOWN/unmatched`；点击“完成”并返回主页后，主页再次被返回为 `SHOP/shop`（置信度 1.0），确认 HOME/SHOP 规则重叠可重复出现。
 - **训练结算链路**：训练局投降后实际经过“失败”→“继续”→战场通票奖励页→卡组详情；奖励页实时识别为 `RESULT/template-result-continue`，置信度 0.99。首次失败页本身仍可能被宽松规则误判，需独立结果模板或页面优先级继续校准。
 
 ## 重要文档索引
