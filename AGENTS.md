@@ -127,6 +127,13 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - 已增加 `DAILY_FIRST_WIN` 组合识别（顶部暗化 + 标题 + 查看战场按钮 + 金币堆 + 底部奖励提示），领取动作固定点击底部奖励提示区域；不得点击右上“查看战场”。
 - 原生 1280×720 实机截图与用户缩放附图的特征值不同，实测校准以原生画面为准；附图仅作页面结构证据，不能直接复用其亮度上限。
 
+### 2026-08-24 雷电 Android 14 启动日志写入异常
+
+- 实测设备 `emulator-5554` 为 Android 14 / API 34；启动独立 APK 后完整异常为：`FileNotFoundException: /sdcard/AutoJs6/KardsScript/auto-main-log.jsonl: open failed: ENOENT (No such file or directory)`。
+- 同时系统日志明确记录 `MediaProvider: Creating or writing to a non-default top level directory is not allowed!`；`/sdcard/AutoJs6` 在新实例中不存在。
+- 根因不是 KARDS 识别或 OpenCV，而是 Android 14 共享存储限制：`auto-main.js` 第 33 行吞掉 `files.ensureDir(archiveDir)` 的失败，第 34 行又未捕获地写入公共目录，最终显示 `Wrapped org.autojs.autojs.pio.UncheckedIOException`。
+- Android 9 的 `emulator-5556` 与 Android 14 新实例行为不同；日志、运行状态和策略文件应优先迁移到应用私有目录，或显式处理 Android 11+ 的共享存储授权/目录创建失败。
+
 ## 重要文档索引
 
 - `README.md`：安装、权限、模拟器机型、风险声明和用户说明。
