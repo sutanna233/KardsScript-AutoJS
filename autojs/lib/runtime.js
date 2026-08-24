@@ -4,7 +4,7 @@ var driverModule = require("./driver");
 var humanize = require("./humanize");
 
 module.exports.create = function (config) {
-    var stopped = false, last = "", same = 0, signature = "", pending = null, failures = 0, endTurnRequestedAt = 0, deploymentCursor = 0, failedDeploymentSlots = {}, skippedCardPlay = false, handSignature = "", handStable = 0, blockedCardIds = {}, blockedUnitIds = {}, blockedUnitBounds = {}, unitActionRetries = {}, unitAttempts = 0, playAttempts = 0, opponentTurnSince = 0;
+    var stopped = false, last = "", same = 0, signature = "", pending = null, failures = 0, endTurnRequestedAt = 0, deploymentCursor = 0, failedDeploymentSlots = {}, skippedCardPlay = false, handSignature = "", handStable = 0, blockedCardIds = {}, blockedUnitIds = {}, blockedUnitBounds = {}, unitActionRetries = {}, unitAttempts = 0, playAttempts = 0, opponentTurnSince = 0, cardPlayAttempts = {}, lastAttemptedCardId = null;
     var driver = driverModule.create(config);
     var planner = strategy.create(config);
     // Auto.js6 also surfaces console output as an on-screen overlay.  Any
@@ -407,6 +407,20 @@ module.exports.create = function (config) {
                     if (card) blockedCardIds[String(card.id)] = true;
                     return log("费用徽章非橙色，禁止拖牌");
                 }
+                // 单卡出牌次数护栏：上一次尝试的牌若仍在手牌中，说明上次
+                // 是误判确认或失败回弹（牌并未真实打出），保留其计数。
+                // 真实打出（牌已从手牌消失）才清零。幻影牌/误判可出的牌会
+                // 因此累积计数，达到上限后被本回合封锁，转向下一张牌或结束
+                // 回合，硬性打断"误判可出 → 反复拖牌 → 卡死"循环。
+                var maxPerCard = Math.max(1, config.maxCardPlayAttemptsPerCard || 2);
+                if (lastAttemptedCardId && lastAttemptedCardId !== String(card.id)) {
+                    if (!source(state, lastAttemptedCardId)) delete cardPlayAttempts[lastAttemptedCardId];
+                }
+                if ((cardPlayAttempts[String(card.id)] || 0) >= maxPerCard) {
+                    blockedCardIds[String(card.id)] = true;
+                    cardPlayAttempts[String(card.id)] = 0;
+                    return log("该牌本回合出牌已达上限(" + maxPerCard + "次)仍未打出，跳过");
+                }
                 var currentDeploymentSlots = deploymentSlots(state);
                 var deploymentIndex = freeDeploymentIndex(state);
                 if (deploymentIndex < 0) {
@@ -419,6 +433,10 @@ module.exports.create = function (config) {
                     thinkBeforeAction();
                     var played = driver.playCard(card, deploymentSlot, observation.frame, observation.state, playAttempts);
                     if (!played.ok) return fail(played);
+                    // 记录本次出牌尝试：计数 + 记住牌 id，供下一帧判断"牌
+                    // 是否真实打出"（仍在手牌则视为未打出，计数保留）。
+                    cardPlayAttempts[String(card.id)] = (cardPlayAttempts[String(card.id)] || 0) + 1;
+                    lastAttemptedCardId = String(card.id);
                     pending = {
                         action: domain.Action.PLAY_CARD,
                         handCount: (state.hand || []).length,
@@ -543,6 +561,9 @@ module.exports.create = function (config) {
             playAttempts = 0;
             failedDeploymentSlots = {};
             deploymentCursor = 0;
+            // 回合转换时清空单卡出牌计数（新一轮每张牌重新计算尝试次数）。
+            cardPlayAttempts = {};
+            lastAttemptedCardId = null;
             // A turn transition invalidates any source/target handshake from
             // the previous frame. Never carry a stale card or unit action
             // into the next player turn after a fast server-side resolution.

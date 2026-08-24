@@ -4,6 +4,6 @@
   "ignore": ["captures/"],
   "icon": "assets/comet-assistant-icon.png",
   "packageName": "com.kardsscript.autojs",
-  "versionName": "1.1.2",
-  "versionCode": 15
+  "versionName": "1.1.3",
+  "versionCode": 16
 }

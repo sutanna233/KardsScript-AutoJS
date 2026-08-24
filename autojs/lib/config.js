@@ -100,6 +100,10 @@ module.exports = {
     unitActionPaceMs: 500,
     endTurnPaceMs: 800,
     navPaceMs: 1200,
+    // 单卡单回合出牌次数上限：同一张手牌被反复尝试出牌超过此次数仍未真实
+    // 打出（牌仍在手牌中），则本回合封锁该牌并转向下一张/结束回合。
+    // 这是防"幻影牌/误判可出"导致的出牌卡死循环的护栏。
+    maxCardPlayAttemptsPerCard: 2,
     // ── 拟人化 / 反脚本检测参数 ──────────────────────────────────────────────
     // enabled=false 时所有偏移和延迟退化为原始固定值（用于回归测试）。
     // tapJitterRadius: tap 坐标最大偏移像素（8px 不会点错 50px+ 的按钮）

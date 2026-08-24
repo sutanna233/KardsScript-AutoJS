@@ -164,7 +164,7 @@ while (completedGames < targetGames) {
         // Vision owns the single badge-colour decision. Do not overwrite it
         // with a second, less-calibrated scan at this boundary.
         var key = observation.uiScreen.screen + "/" + observation.scene.scene;
-        if (observeMs > 1200) record({ t: Date.now() - started, event: "vision-slow-frame", observeMs: observeMs, screen: observation.uiScreen.screen, scene: observation.scene.scene });
+        if (observeMs > 1200) record({ t: Date.now() - started, event: "vision-slow-frame", observeMs: observeMs, screen: observation.uiScreen.screen, scene: observation.scene.scene, perf: observation.perf || null });
         if (key !== lastKey) {
             var nextPhase = observation.uiScreen.screen === "RESULT" ? "RESULT" :
                 observation.uiScreen.screen === "BATTLE" ? "IN_GAME" :

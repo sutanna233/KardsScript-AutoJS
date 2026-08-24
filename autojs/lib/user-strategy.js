@@ -45,6 +45,7 @@ var DEFAULT = {
     preferFrontlineUnits: true,
     maxCardPlaysPerTurn: 3,
     maxUnitActionAttemptsPerUnit: 2,
+    maxCardPlayAttemptsPerCard: 2,
     modeType: "training",
     cardPlayPaceMs: 600,
     unitActionPaceMs: 500,
@@ -104,6 +105,10 @@ function errors(value) {
             result.push(field + " 必须是 1 到 3 的整数");
         }
     });
+    // 单卡出牌次数上限：防止幻影牌/误判可出导致的卡死循环。范围放宽到 1~5。
+    if (value.maxCardPlayAttemptsPerCard != null && (!isFinite(Number(value.maxCardPlayAttemptsPerCard)) || Number(value.maxCardPlayAttemptsPerCard) < 1 || Number(value.maxCardPlayAttemptsPerCard) > 5)) {
+        result.push("maxCardPlayAttemptsPerCard 必须是 1 到 5 的整数");
+    }
     ["cardPlayPaceMs", "unitActionPaceMs", "endTurnPaceMs", "navPaceMs"].forEach(function (field) {
         if (value[field] != null && (!isFinite(Number(value[field])) || Number(value[field]) < PACE_MIN[field] || Number(value[field]) > PACE_MAX[field])) {
             result.push(field + " 必须在 " + PACE_MIN[field] + " 到 " + PACE_MAX[field] + " 毫秒之间");
@@ -132,6 +137,7 @@ function normalize(value) {
     if (typeof value.preferFrontlineUnits === "boolean") result.preferFrontlineUnits = value.preferFrontlineUnits;
     result.maxCardPlaysPerTurn = integer(value.maxCardPlaysPerTurn, result.maxCardPlaysPerTurn, 1, 3);
     result.maxUnitActionAttemptsPerUnit = integer(value.maxUnitActionAttemptsPerUnit, result.maxUnitActionAttemptsPerUnit, 1, 3);
+    result.maxCardPlayAttemptsPerCard = integer(value.maxCardPlayAttemptsPerCard, result.maxCardPlayAttemptsPerCard, 1, 5);
     if (MODE_TYPES[value.modeType]) result.modeType = value.modeType;
     ["cardPlayPaceMs", "unitActionPaceMs", "endTurnPaceMs", "navPaceMs"].forEach(function (field) {
         result[field] = integer(value[field], result[field], PACE_MIN[field], PACE_MAX[field]);
@@ -172,6 +178,7 @@ function apply(config, preferences) {
     config.preferFrontlineUnits = strategy.preferFrontlineUnits;
     config.maxPlayAttemptsPerTurn = strategy.maxCardPlaysPerTurn;
     config.maxUnitActionAttemptsPerUnit = strategy.maxUnitActionAttemptsPerUnit;
+    config.maxCardPlayAttemptsPerCard = strategy.maxCardPlayAttemptsPerCard;
     config.modeType = strategy.modeType;
     config.cardPlayPaceMs = strategy.cardPlayPaceMs;
     config.unitActionPaceMs = strategy.unitActionPaceMs;
