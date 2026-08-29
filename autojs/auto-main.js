@@ -5,6 +5,7 @@ var vision = require("./lib/vision");
 var runtime = require("./lib/runtime");
 var userStrategy = require("./lib/user-strategy");
 var humanize = require("./lib/humanize");
+var environment = require("./lib/environment");
 // var floatingController = require("./lib/floating-controller"); // rawWindow 在 inrt 上仍会裁剪，暂时禁用
 var config = {};
 Object.keys(base).forEach(function (key) { config[key] = base[key]; });
@@ -94,6 +95,31 @@ function localBadgeColor(image, card, index, count) {
 // launched first, Auto.js' capture/privilege prompt can cover the mulligan
 // confirmation button while the game continues its countdown.
 if (!requestScreenCapture(true)) { record({ error: "capture-permission" }); exit(); }
+var initialEnvironmentFrame = null, environmentReport = null, environmentBlocked = false;
+try {
+    initialEnvironmentFrame = captureScreen();
+    environmentReport = environment.collect(config, initialEnvironmentFrame, { runtimeRoot: runtimeRoot });
+    files.write(runtimeRoot + "/environment-report.json", JSON.stringify(environmentReport, null, 2));
+    record({ event: "environment-check", safeForActions: environmentReport.safeForActions,
+        capture: environmentReport.capture, issues: environmentReport.issues,
+        warnings: environmentReport.warnings, device: environmentReport.device,
+        runtime: environmentReport.runtime });
+    if (!environmentReport.safeForActions) {
+        environmentBlocked = true;
+        config.mode = "observe";
+        config.allowNavigation = false;
+        config.allowBattleActions = false;
+        record({ event: "environment-blocked", detail: "环境不满足自动操作契约，已降级为 observe-only",
+            issues: environmentReport.issues });
+    }
+} catch (environmentError) {
+    environmentBlocked = true;
+    config.mode = "observe";
+    config.allowNavigation = false;
+    config.allowBattleActions = false;
+    record({ event: "environment-check-failed", error: String(environmentError) });
+}
+try { if (initialEnvironmentFrame && initialEnvironmentFrame.recycle) initialEnvironmentFrame.recycle(); } catch (_) {}
 try { files.write(runtimeRoot + "/floating-control-state.txt", "running"); } catch (_) {}
 // 悬浮窗目前先禁用，避免 Auto.js6 rawWindow 在 inrt 中出现子控件裁剪。
 // 保留 __cometPaused 状态，后续改为可靠的原生悬浮服务。
@@ -132,6 +158,7 @@ config.actionLogger = function (action) {
         sincePreviousActionMs: previous ? now - previous : null });
 };
 record({ event: "run-start", runId: runId, targetGames: targetGames, requireMulligan: true,
+    environmentBlocked: environmentBlocked, environmentReportPath: runtimeRoot + "/environment-report.json",
     userStrategy: activeUserStrategy, userStrategySource: loadedUserStrategy.source,
     userStrategyErrors: loadedUserStrategy.errors });
 // A real training match can exceed several minutes; keep the entrypoint alive
@@ -170,7 +197,7 @@ while (completedGames < targetGames) {
             }
             frame = captureScreen();
             if (!frame) { record({ t: Date.now() - started, event: "capture-empty" }); sleep(800); continue; }
-            if (frame.getWidth() !== 1280 || frame.getHeight() !== 720) {
+            if (frame.getWidth() !== config.environment.expectedWidth || frame.getHeight() !== config.environment.expectedHeight) {
                 record({ t: Date.now() - started, event: "capture-size-mismatch", width: frame.getWidth(), height: frame.getHeight() });
                 sleep(1200);
                 continue;

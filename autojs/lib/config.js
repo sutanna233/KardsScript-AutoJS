@@ -1,5 +1,9 @@
 module.exports = {
     kardsPackage: "com.android1939.kardsapk",
+    // The current vision/templates are calibrated to this capture contract.
+    // A runtime mismatch must downgrade to observe-only until a calibrated
+    // profile is available; scaling coordinates alone is not sufficient.
+    environment: { expectedWidth: 1280, expectedHeight: 720, aspectTolerance: 0.015 },
     decisionTreePath: "strategy/default-decision-tree.json",
     templateThreshold: 0.82,
     ourTurnOrangeRatio: 0.08,

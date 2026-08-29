@@ -152,6 +152,14 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
 - **无卡包页误判**：主页“打开卡包”可安全进入“没有卡包可以开了。访问商店获取更多内容。”页面，未点击商店；该真实页面被实时探针误判为 `HOME`（置信度 1.0）。
 - **训练结算链路**：训练局投降后实际经过“失败”→“继续”→战场通票奖励页→卡组详情；奖励页实时识别为 `RESULT/template-result-continue`，置信度 0.99。首次失败页本身仍可能被宽松规则误判，需独立结果模板或页面优先级继续校准。
 
+### 2026-08-29 环境适配性基线
+
+- 用户反馈：开发机测试正常，但交给别人使用时经常出问题；问题不应只按“分辨率是否为 1280×720”判断。
+- `autojs/lib/environment.js` 负责启动环境画像：截图尺寸/比例、Android 设备与 SDK、DPI、当前包、运行目录和 `su` Root 输入能力；报告写入运行数据目录的 `environment-report.json`。
+- 自动入口发现截图契约或 Root 输入不满足时，必须把 `mode` 切回 `observe` 并关闭导航/战斗动作，记录 `environment-check` 与 `environment-blocked`，不得通过简单拉伸坐标放行。
+- 当前自动操作契约仍是横屏 1280×720 + 截图权限 + 可用 Root/`input touchscreen`；要支持其他分辨率，必须先采集模板、视口留边和手牌/棋盘几何，形成独立设备 profile，并补充离线回放证据。
+- 适配问题排查优先收集 `environment-report.json`、同一时段 JSONL 日志和一张原生截图，先区分环境阻断、页面误识别、输入失败和游戏 UI 版本变化。
+
 ## 重要文档索引
 
 - `README.md`：安装、权限、模拟器机型、风险声明和用户说明。
