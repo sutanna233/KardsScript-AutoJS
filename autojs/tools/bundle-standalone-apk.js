@@ -8,6 +8,33 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const modules = new Map();
 
+function syncInrtVersion() {
+    const projectSource = fs.readFileSync(path.join(root, "project.json"), "utf8").replace(/^\uFEFF/, "");
+    const project = JSON.parse(projectSource);
+    const versionName = String(project.versionName || "").trim();
+    const versionCode = Number(project.versionCode);
+    if (!versionName || !Number.isInteger(versionCode) || versionCode < 1) {
+        throw new Error("project.json contains an invalid versionName/versionCode");
+    }
+    const gradleFile = path.resolve(root, "..", "vendor", "AutoJs6", "app", "build.gradle.kts");
+    if (!fs.existsSync(gradleFile)) return false;
+    const source = fs.readFileSync(gradleFile, "utf8");
+    const start = source.indexOf("create(flavorNameInrt)");
+    const end = source.indexOf("\n        androidResources", start);
+    if (start < 0 || end < 0) throw new Error("cannot locate AutoJs6 inrt flavor block");
+    const before = source.slice(0, start);
+    const block = source.slice(start, end)
+        .replace(/versionCode\s*=\s*[^\r\n]+/, "versionCode = " + versionCode)
+        .replace(/versionName\s*=\s*[^\r\n]+/, "versionName = " + JSON.stringify(versionName));
+    if (!/versionCode\s*=\s*\d+/.test(block) || !/versionName\s*=\s*"[^"]+"/.test(block)) {
+        throw new Error("failed to update AutoJs6 inrt version fields");
+    }
+    const updated = before + block + source.slice(end);
+    if (updated !== source) fs.writeFileSync(gradleFile, updated, "utf8");
+    console.log("Synced inrt manifest version to " + versionName + " (" + versionCode + ")");
+    return true;
+}
+
 function moduleId(file) {
     return "/" + path.relative(root, file).replace(/\\/g, "/");
 }
@@ -36,6 +63,7 @@ function registry(files) {
 
 const launcherFile = path.join(root, "launcher.js");
 const runnerFile = path.join(root, "auto-main.js");
+syncInrtVersion();
 collect(launcherFile);
 const launcherModules = Array.from(modules.keys());
 collect(runnerFile);

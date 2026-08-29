@@ -52,8 +52,9 @@ Get-ChildItem autojs/test -Filter *.test.js | ForEach-Object { node $_.FullName 
   - `vendor/AutoJs6/libs/org-opencv-4_8_0/opencv-4.8.0.aar`：`libopencv_java4` ×4 ABI
 - **只注入 termexec AAR（8 个）会在战斗时报 `images.findImage` 失败 / `org.opencv.core.Mat.n_Mat() UnsatisfiedLinkError`**：`libopencv_java4.so` 依赖 `libc++_shared.so`，缺它则 OpenCV 加载失败、Java 层 `Mat.n_Mat()` 无实现。`libc++_shared.so` 必须注入。
 - 注入脚本支持混用 AAR 与单个 .so：`python tools/add-native-libs-to-apk.py <built.apk> <opencv.aar> <apk-native-sources/**.so...> <out.apk>`（.so 的 ABI 取自其父目录名）。
-- 构建产物：`vendor/AutoJs6/app/build/outputs/apk/inrt/debug/comet-v6.7.0-universal.apk`；zipalign/apksigner 用 `C:\Users\User\scoop\apps\android-clt\current\build-tools\36.0.0\`。
+- 构建产物：`vendor/AutoJs6/app/build/outputs/apk/inrt/debug/comet-v<projectVersion>-universal.apk`；zipalign/apksigner 用 `C:\Users\User\scoop\apps\android-clt\current\build-tools\36.0.0\`。
 - 生成物不入库：`apk-main.js`、APK、`vendor/`、`native-shell/`、`apk-native-sources/`、截图均不进公开 Git。
+- **发布版本同步（2026-08-29）**：`project.json` 的 `versionName/versionCode` 不会自动覆盖 inrt AndroidManifest；若不处理，`aapt dump badging` 会继续显示 AutoJs6 的 `6.7.0/3804`。`bundle-standalone-apk.js` 现会读取 `project.json`，并在本地存在 `vendor/AutoJs6` 时同步 inrt flavor 的两个版本字段。发布前必须用 `aapt dump badging` 验证实际 APK 元数据。
 
 ## 输入与安全红线
 

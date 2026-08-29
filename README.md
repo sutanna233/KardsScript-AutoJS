@@ -609,7 +609,7 @@ cd J:\dev\KardsScript\vendor\AutoJs6
 # 3. 注入 native 库（.so 文件）
 cd J:\dev\KardsScript
 python tools\add-native-libs-to-apk.py `
-  vendor\AutoJs6\app\build\outputs\apk\inrt\debug\comet-v6.7.0-universal.apk `
+  vendor\AutoJs6\app\build\outputs\apk\inrt\debug\comet-v<projectVersion>-universal.apk `
   vendor\AutoJs6\libs\jackpal-androidterm-libtermexec-1_0\libtermexec-release.aar `
   CometAssistant-jni-unsigned.apk
 
